@@ -60,30 +60,40 @@ if ! command -v docker &> /dev/null; then
     log_success "Docker installed and started successfully."
 fi
 
-# 3. Check .env file
-if [ ! -f .env ]; then
-    if [ -f .env.example ]; then
-        log_warn ".env file not found. Creating from .env.example..."
-        cp .env.example .env
-        chmod 600 .env
-        log_error "Please edit .env and configure your DISCORD_TOKEN before starting!"
-        echo "Run: nano .env"
-        exit 1
+# 3. Check /etc/discord-cpe directory and .env file
+CONF_DIR="/etc/discord-cpe"
+ENV_PATH="$CONF_DIR/.env"
+
+$SUDO mkdir -p "$CONF_DIR"
+
+if [ ! -f "$ENV_PATH" ]; then
+    if [ -f .env ]; then
+        log_info "Migrating local .env to $ENV_PATH..."
+        $SUDO cp .env "$ENV_PATH"
+    elif [ -f .env.example ]; then
+        log_warn "$ENV_PATH not found. Initializing from .env.example..."
+        $SUDO cp .env.example "$ENV_PATH"
     else
-        log_error ".env and .env.example are missing!"
+        log_error "Neither $ENV_PATH nor .env.example exists!"
         exit 1
     fi
-fi
-
-# Verify DISCORD_TOKEN is set
-if grep -q "your_discord_bot_token_here" .env || ! grep -q "^DISCORD_TOKEN=" .env; then
-    log_error "DISCORD_TOKEN in .env is still set to placeholder or empty!"
-    echo "Please edit .env: nano .env"
+    $SUDO chmod 600 "$ENV_PATH"
+    log_error "Please configure your DISCORD_TOKEN in $ENV_PATH before starting!"
+    echo "Run: sudo nano $ENV_PATH"
     exit 1
 fi
 
-chmod 600 .env
-log_info "Permissions for .env secured (600)."
+$SUDO chmod 600 "$ENV_PATH"
+log_info "Secured permissions for $ENV_PATH (600)."
+
+# Verify DISCORD_TOKEN is set
+if grep -q "your_discord_bot_token_here" "$ENV_PATH" || ! grep -q "^DISCORD_TOKEN=" "$ENV_PATH"; then
+    log_error "DISCORD_TOKEN in $ENV_PATH is still set to placeholder or empty!"
+    echo "Please edit $ENV_PATH: sudo nano $ENV_PATH"
+    exit 1
+fi
+
+export ENV_FILE="$ENV_PATH"
 
 # 4. Build and start containers
 log_info "Building and launching containers via Docker Compose..."

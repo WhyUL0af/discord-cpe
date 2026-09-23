@@ -1,5 +1,19 @@
+import os
+from pathlib import Path
 from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def get_default_env_file() -> str:
+    """Determine the env file location.
+
+    Checks ENV_FILE env var, then /etc/discord-cpe/.env, then fallback to local .env.
+    """
+    if os.getenv("ENV_FILE"):
+        return os.getenv("ENV_FILE")
+    if Path("/etc/discord-cpe/.env").exists():
+        return "/etc/discord-cpe/.env"
+    return ".env"
 
 
 class Settings(BaseSettings):
@@ -26,7 +40,7 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=get_default_env_file(),
         env_file_encoding="utf-8",
         extra="ignore"
     )

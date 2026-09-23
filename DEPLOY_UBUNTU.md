@@ -21,20 +21,25 @@ cd /opt/discord-cpe
 scp -r c:\me\Projects\discord-cpe user@your-server-ip:/opt/discord-cpe
 ```
 
-### Step 2. 設定環境變數 `.env`
+### Step 2. 設定環境變數於 `/etc/discord-cpe/.env`
+
+依據 Linux 系統組態規範，將敏感設定檔統一置於 `/etc/discord-cpe`：
 
 ```bash
-cd /opt/discord-cpe
-cp .env.example .env
+# 1. 建立系統設定檔目錄
+sudo mkdir -p /etc/discord-cpe
 
-# 設定安全權限，避免敏感 Token 洩漏
-chmod 600 .env
+# 2. 將範本複製至 /etc/discord-cpe/.env
+sudo cp /opt/discord-cpe/.env.example /etc/discord-cpe/.env
 
-# 編輯設定檔填入你的 DISCORD_TOKEN
-nano .env
+# 3. 嚴格鎖定權限（僅 root / 系統管理者可讀寫，保護 Token 不洩漏）
+sudo chmod 600 /etc/discord-cpe/.env
+
+# 4. 編輯設定檔填入你的 DISCORD_TOKEN
+sudo nano /etc/discord-cpe/.env
 ```
 
-在 `.env` 中確認以下項目：
+在 `/etc/discord-cpe/.env` 中確認以下項目：
 ```ini
 DISCORD_TOKEN=你的_DISCORD_BOT_TOKEN
 # DATABASE_URL 在 docker-compose 內部會自動指定，維持預設即可
@@ -135,10 +140,12 @@ pip install -r requirements.txt
 ### Step 4. 設定環境變數與執行資料庫遷移
 
 ```bash
-cp .env.example .env
-nano .env
+sudo mkdir -p /etc/discord-cpe
+sudo cp /opt/discord-cpe/.env.example /etc/discord-cpe/.env
+sudo chmod 600 /etc/discord-cpe/.env
+sudo nano /etc/discord-cpe/.env
 ```
-修改 `.env` 中的 `DATABASE_URL`：
+修改 `/etc/discord-cpe/.env` 中的 `DATABASE_URL` 與 `DISCORD_TOKEN`：
 ```ini
 DATABASE_URL=postgresql+asyncpg://cpe_user:your_strong_password@localhost:5432/cpe_bot
 DISCORD_TOKEN=你的_DISCORD_BOT_TOKEN
@@ -146,7 +153,8 @@ DISCORD_TOKEN=你的_DISCORD_BOT_TOKEN
 
 執行 Alembic 資料庫 Migration：
 ```bash
-alembic upgrade head
+cd /opt/discord-cpe
+ENV_FILE=/etc/discord-cpe/.env alembic upgrade head
 ```
 
 ### Step 5. 註冊 Systemd 系統服務（自動重啟與開機啟動）
