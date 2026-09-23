@@ -86,7 +86,7 @@ class SessionRepository:
         session: AsyncSession,
         user_id: int,
         problem_id: int,
-        thread_id: int,
+        thread_id: Optional[int] = None,
         last_submission_id: int = 0
     ) -> ActiveProblemSession:
         prob_session = ActiveProblemSession(
@@ -100,6 +100,25 @@ class SessionRepository:
         session.add(prob_session)
         await session.flush()
         return prob_session
+
+    @staticmethod
+    async def close_session(
+        session: AsyncSession,
+        session_id: int,
+    ) -> Optional[ActiveProblemSession]:
+        return await SessionRepository.update_status(session, session_id, status="closed")
+
+    @staticmethod
+    async def close_active_session_by_user(
+        session: AsyncSession,
+        user_id: int,
+    ) -> Optional[ActiveProblemSession]:
+        active = await SessionRepository.get_latest_active_by_user(session, user_id)
+        if active:
+            active.status = "closed"
+            await session.flush()
+            return active
+        return None
 
     @staticmethod
     async def update_status(

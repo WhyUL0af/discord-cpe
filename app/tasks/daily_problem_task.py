@@ -133,7 +133,7 @@ class DailyProblemTask(commands.Cog):
                     )
                     embed.add_field(name="Difficulty：", value=problem.difficulty or "Unknown", inline=True)
                     embed.add_field(name="Solved Today：", value=str(solved_today), inline=True)
-                    embed.set_footer(text="點擊「💻 開始作答」建立專屬 Thread，前往 UVa 提交即可自動追蹤評測結果！")
+                    embed.set_footer(text="點擊「💻 開始作答」記錄作答，前往 UVa 提交即可透過私訊自動追蹤評測結果！")
 
                     view = DailyProblemView(problem)
                     msg = await channel.send(embed=embed, view=view)

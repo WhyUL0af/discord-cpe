@@ -14,6 +14,7 @@ class GuildSettings(Base):
     ranking_channel_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
     discussion_channel_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
     ranking_message_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    practice_message_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
     archive_thread_on_solve: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     def __repr__(self) -> str:

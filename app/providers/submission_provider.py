@@ -36,6 +36,16 @@ VERDICT_DISPLAY_MAP = {
 }
 
 
+LANGUAGE_MAP = {
+    1: "C",
+    2: "Java",
+    3: "C++",
+    4: "Pascal",
+    5: "C++11",
+    6: "Python 3",
+}
+
+
 class SubmissionData:
     def __init__(
         self,
@@ -53,6 +63,10 @@ class SubmissionData:
         self.runtime = runtime
         self.submission_time = submission_time
         self.language_id = language_id
+
+    @property
+    def language(self) -> str:
+        return LANGUAGE_MAP.get(self.language_id, f"Other ({self.language_id})")
 
     @property
     def is_accepted(self) -> bool:

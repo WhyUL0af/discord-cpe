@@ -55,3 +55,14 @@ class GuildRepository:
         settings.ranking_message_id = ranking_message_id
         await session.flush()
         return settings
+
+    @staticmethod
+    async def update_practice_message_id(
+        session: AsyncSession,
+        guild_id: int,
+        practice_message_id: int
+    ) -> GuildSettings:
+        settings = await GuildRepository.get_or_create(session, guild_id)
+        settings.practice_message_id = practice_message_id
+        await session.flush()
+        return settings

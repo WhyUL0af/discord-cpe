@@ -45,7 +45,7 @@ sudo chmod 600 /etc/discord-cpe/.env
 ### Step 2. 第一次部署（建立首個 release 與 current）
 
 ```bash
-# 1. 產生第一版發布
+# 1. 產生第一版發布目錄
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 git clone https://github.com/WhyUL0af/discord-cpe.git /opt/discord-cpe/release/$TIMESTAMP
 
@@ -54,7 +54,7 @@ ln -sfn /opt/discord-cpe/release/$TIMESTAMP /opt/discord-cpe/current
 
 # 3. 進入 current 啟動容器
 cd /opt/discord-cpe/current
-docker compose up -d --build
+sudo docker compose up -d --build
 ```
 
 ### Step 3. 後續自動化部署與回滾

@@ -12,20 +12,26 @@ from app.repositories.submission_repo import SubmissionRepository
 from app.repositories.user_repo import UserRepository
 from app.providers.submission_provider import SubmissionData, SubmissionProvider
 
+from app.models.submission import Submission
+
 logger = logging.getLogger(__name__)
 
 
 class SubmissionNotification(NamedTuple):
     session_id: int
-    thread_id: int
     discord_user_id: int
     problem_number: int
     problem_title: str
+    submission_id: int
+    language: str
     verdict: str
     display_verdict: str
     runtime: Optional[int]
     attempts: int
     is_accepted: bool
+    started_at: datetime
+    solved_at: Optional[datetime] = None
+    thread_id: Optional[int] = None
 
 
 class SubmissionService:
@@ -105,15 +111,19 @@ class SubmissionService:
             notifications.append(
                 SubmissionNotification(
                     session_id=active_session.id,
-                    thread_id=active_session.thread_id,
                     discord_user_id=user.discord_user_id,
                     problem_number=problem.problem_number,
                     problem_title=problem.title,
+                    submission_id=sub.submission_id,
+                    language=sub.language,
                     verdict=sub.verdict,
                     display_verdict=sub.display_verdict,
                     runtime=sub.runtime,
                     attempts=attempts,
                     is_accepted=is_accepted,
+                    started_at=active_session.started_at,
+                    solved_at=active_session.solved_at if is_accepted else None,
+                    thread_id=active_session.thread_id,
                 )
             )
 
@@ -136,3 +146,18 @@ class SubmissionService:
 
         solved_list = await SolvedRepository.get_user_solved_problems(session, user.id)
         return [(s.problem.problem_number, s.problem.title) for s in solved_list]
+
+    async def get_recent_submissions_for_problem(
+        self,
+        session: AsyncSession,
+        user_id: int,
+        problem_id: int,
+        limit: int = 5,
+    ) -> List[Submission]:
+        """Fetch recent submissions for a specific user and problem."""
+        return await SubmissionRepository.get_recent_submissions_for_problem(
+            session=session,
+            user_id=user_id,
+            problem_id=problem_id,
+            limit=limit,
+        )

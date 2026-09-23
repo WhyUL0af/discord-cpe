@@ -42,3 +42,11 @@ class GuildService:
         message_id: int,
     ) -> GuildSettings:
         return await GuildRepository.update_ranking_message_id(session, guild_id, message_id)
+
+    @staticmethod
+    async def set_practice_message(
+        session: AsyncSession,
+        guild_id: int,
+        message_id: int,
+    ) -> GuildSettings:
+        return await GuildRepository.update_practice_message_id(session, guild_id, message_id)

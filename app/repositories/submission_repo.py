@@ -57,3 +57,22 @@ class SubmissionRepository:
         )
         result = await session.execute(stmt)
         return result.scalar_one() or 0
+
+    @staticmethod
+    async def get_recent_submissions_for_problem(
+        session: AsyncSession,
+        user_id: int,
+        problem_id: int,
+        limit: int = 5,
+    ) -> list[Submission]:
+        stmt = (
+            select(Submission)
+            .where(
+                Submission.user_id == user_id,
+                Submission.problem_id == problem_id,
+            )
+            .order_by(Submission.submitted_at.desc())
+            .limit(limit)
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars().all())

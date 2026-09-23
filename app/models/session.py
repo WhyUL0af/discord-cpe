@@ -16,7 +16,7 @@ class ActiveProblemSession(Base):
     )
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
     problem_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("problems.id", ondelete="CASCADE"), index=True, nullable=False)
-    thread_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True, nullable=False)
+    thread_id: Mapped[Optional[int]] = mapped_column(BigInteger, unique=False, index=True, nullable=True)
     last_submission_id: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)  # active, solved, closed
     started_at: Mapped[datetime] = mapped_column(

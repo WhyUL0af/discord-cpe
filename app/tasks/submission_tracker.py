@@ -67,75 +67,84 @@ class SubmissionTracker(commands.Cog):
 
     async def _dispatch_notification(self, notif: SubmissionNotification) -> None:
         logger.info(
-            f"Submission detected for user {notif.discord_user_id} on UVa {notif.problem_number}: verdict={notif.verdict}"
+            f"Submission detected for user {notif.discord_user_id} on UVa {notif.problem_number}: verdict={notif.verdict} (sub_id={notif.submission_id})"
         )
 
         try:
-            channel = self.bot.get_channel(notif.thread_id)
-            if not channel:
-                channel = await self.bot.fetch_channel(notif.thread_id)
+            user = self.bot.get_user(notif.discord_user_id)
+            if not user:
+                try:
+                    user = await self.bot.fetch_user(notif.discord_user_id)
+                except Exception as e:
+                    logger.warning(f"Could not fetch user {notif.discord_user_id} for DM notification: {e}")
+                    return
 
-            if not isinstance(channel, discord.Thread):
-                logger.warning(f"Channel {notif.thread_id} is not a Thread.")
+            if not user:
+                logger.warning(f"User {notif.discord_user_id} not found.")
                 return
 
             if notif.is_accepted:
+                # Calculate elapsed solve time
+                solve_time_str = "即時"
+                if notif.started_at:
+                    end_time = notif.solved_at or datetime.now(timezone.utc)
+                    elapsed_seconds = max(0, int((end_time - notif.started_at).total_seconds()))
+                    mins = elapsed_seconds // 60
+                    hrs = mins // 60
+                    if hrs > 0:
+                        solve_time_str = f"{hrs} 小時 {mins % 60} 分鐘"
+                    elif mins > 0:
+                        solve_time_str = f"{mins} 分鐘"
+                    else:
+                        solve_time_str = f"{elapsed_seconds} 秒"
+
                 embed = discord.Embed(
-                    title="✅ Accepted",
+                    title="🎉 恭喜 Accepted (AC)！",
+                    description=f"你已成功解開 **UVa {notif.problem_number} - {notif.problem_title}**！",
                     color=discord.Color.green(),
                 )
-                embed.add_field(name="Problem：", value=f"UVa {notif.problem_number} - {notif.problem_title}", inline=False)
-                embed.add_field(name="User：", value=f"<@{notif.discord_user_id}>", inline=True)
-                embed.add_field(name="Attempts：", value=str(notif.attempts), inline=True)
-                if notif.runtime is not None:
-                    embed.add_field(name="Runtime：", value=f"{notif.runtime} ms", inline=True)
-                embed.set_footer(text="恭喜解題成功！本題已列入個人解題清單與排行榜。")
-
-                await channel.send(content=f"🎉 恭喜 <@{notif.discord_user_id}> AC！", embed=embed)
-
-                # Update thread name to indicate solved
-                new_name = f"✅ UVa {notif.problem_number}｜{channel.name.split('｜')[-1]}"
-                try:
-                    await channel.edit(name=new_name[:100])
-                except Exception as e:
-                    logger.warning(f"Could not rename thread {channel.id}: {e}")
-
-                # Check auto-archive configuration
-                if settings.AUTO_ARCHIVE_THREAD:
-                    try:
-                        await channel.edit(archived=True)
-                    except Exception as e:
-                        logger.warning(f"Could not auto-archive thread {channel.id}: {e}")
+                embed.add_field(name="Submission ID", value=str(notif.submission_id), inline=True)
+                embed.add_field(name="語言", value=notif.language, inline=True)
+                embed.add_field(name="執行時間", value=f"{notif.runtime} ms" if notif.runtime is not None else "N/A", inline=True)
+                embed.add_field(name="嘗試次數", value=f"{notif.attempts} 次", inline=True)
+                embed.add_field(name="作答歷時", value=solve_time_str, inline=True)
+                embed.set_footer(text="本題已自動計入解題紀錄與排行榜！快至刷題中心挑選下一題吧！")
 
             elif notif.verdict == "In queue":
                 embed = discord.Embed(
-                    title="⏳ Submission detected",
-                    description=f"**UVa {notif.problem_number}** - {notif.problem_title}\n\nStatus：Judging...",
+                    title="⏳ 評測中...",
+                    description=f"題目：**UVa {notif.problem_number} - {notif.problem_title}**\n\n系統已偵測到提交，正在等待 UVa 評測結果。",
                     color=discord.Color.gold(),
                 )
-                await channel.send(embed=embed)
+                embed.add_field(name="Submission ID", value=str(notif.submission_id), inline=True)
+                embed.add_field(name="語言", value=notif.language, inline=True)
 
             else:
-                # Other verdicts: Wrong Answer, Time Limit Exceeded, Compilation Error, etc.
                 embed = discord.Embed(
                     title=notif.display_verdict,
+                    description=f"題目：**UVa {notif.problem_number} - {notif.problem_title}**",
                     color=discord.Color.red(),
                 )
-                embed.add_field(name="Problem：", value=f"UVa {notif.problem_number}", inline=False)
-                embed.add_field(name="User：", value=f"<@{notif.discord_user_id}>", inline=True)
-                embed.add_field(name="Attempts：", value=str(notif.attempts), inline=True)
+                embed.add_field(name="Submission ID", value=str(notif.submission_id), inline=True)
+                embed.add_field(name="語言", value=notif.language, inline=True)
                 if notif.runtime is not None and notif.runtime > 0:
-                    embed.add_field(name="Runtime：", value=f"{notif.runtime} ms", inline=True)
+                    embed.add_field(name="執行時間", value=f"{notif.runtime} ms", inline=True)
+                embed.add_field(name="嘗試次數", value=f"第 {notif.attempts} 次嘗試", inline=True)
                 embed.set_footer(text="不要氣餒，檢查邏輯或測資後再次提交！")
 
-                await channel.send(embed=embed)
+            try:
+                await user.send(embed=embed)
+                logger.info(f"Dispatched DM to user {notif.discord_user_id} for UVa {notif.problem_number} ({notif.verdict})")
+            except (discord.Forbidden, discord.HTTPException) as dm_err:
+                logger.warning(
+                    f"Could not send DM to user {notif.discord_user_id} (DM closed/blocked): {dm_err}"
+                )
 
-        except discord.NotFound:
-            logger.warning(f"Thread {notif.thread_id} not found on Discord.")
-        except discord.Forbidden:
-            logger.warning(f"Bot lacks permissions to post in thread {notif.thread_id}.")
         except Exception as e:
-            logger.error(f"Failed to post submission notification to thread {notif.thread_id}: {e}", exc_info=True)
+            logger.error(
+                f"Unexpected error in _dispatch_notification for user {notif.discord_user_id}: {e}",
+                exc_info=True,
+            )
 
 
 async def setup(bot: commands.Bot) -> None:

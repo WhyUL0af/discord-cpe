@@ -67,7 +67,7 @@ class ProblemService:
         session: AsyncSession,
         discord_user_id: int,
         problem_number: int,
-        thread_id: int,
+        thread_id: Optional[int] = None,
         discord_username: Optional[str] = None,
     ) -> Tuple[ActiveProblemSession, bool]:
         """Start or retrieve an active problem session for the user.
@@ -87,7 +87,7 @@ class ProblemService:
         existing = await SessionRepository.get_active_session(session, user.id, problem.id)
         if existing:
             logger.info(
-                f"User {discord_user_id} already has active session for UVa {problem_number} in thread {existing.thread_id}"
+                f"User {discord_user_id} already has active session for UVa {problem_number} (session_id={existing.id})"
             )
             return existing, False
 
@@ -108,7 +108,7 @@ class ProblemService:
             last_submission_id=last_sub_id,
         )
         logger.info(
-            f"User {discord_user_id} started UVa {problem_number} in thread {thread_id} (initial last_sub_id={last_sub_id})"
+            f"User {discord_user_id} started UVa {problem_number} (session_id={new_session.id}, thread_id={thread_id}, initial last_sub_id={last_sub_id})"
         )
         return new_session, True
 
@@ -121,3 +121,14 @@ class ProblemService:
         if not user:
             return None
         return await SessionRepository.get_latest_active_by_user(session, user.id)
+
+    async def close_problem_session(
+        self,
+        session: AsyncSession,
+        discord_user_id: int
+    ) -> Optional[ActiveProblemSession]:
+        """Close the currently active problem session for the user."""
+        user = await UserRepository.get_by_discord_id(session, discord_user_id)
+        if not user:
+            return None
+        return await SessionRepository.close_active_session_by_user(session, user.id)
