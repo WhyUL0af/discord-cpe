@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from typing import Optional
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,6 +20,12 @@ def get_default_env_file() -> str:
 class Settings(BaseSettings):
     # Discord Configuration
     DISCORD_TOKEN: str = ""
+
+    @field_validator("DISCORD_TOKEN", mode="before")
+    def clean_token(cls, v: str) -> str:
+        if isinstance(v, str):
+            return v.strip().strip("'\"")
+        return v
 
     # Database Configuration
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/cpe_bot"
