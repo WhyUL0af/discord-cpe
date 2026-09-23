@@ -22,8 +22,8 @@ class UserSolvedProblem(Base):
     )
 
     # Relationships
-    user = relationship("User", back_populates="solved_problems")
-    problem = relationship("Problem", back_populates="solved_by")
+    user = relationship("User", back_populates="solved_problems", lazy="selectin")
+    problem = relationship("Problem", back_populates="solved_by", lazy="selectin")
 
     __table_args__ = (
         UniqueConstraint("user_id", "problem_id", name="uq_user_solved_problem"),

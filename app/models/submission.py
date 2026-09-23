@@ -26,8 +26,8 @@ class Submission(Base):
     )
 
     # Relationships
-    user = relationship("User", back_populates="submissions")
-    problem = relationship("Problem", back_populates="submissions")
+    user = relationship("User", back_populates="submissions", lazy="selectin")
+    problem = relationship("Problem", back_populates="submissions", lazy="selectin")
 
     def __repr__(self) -> str:
         return f"<Submission ext_id={self.external_submission_id} verdict={self.verdict}>"

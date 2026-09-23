@@ -27,8 +27,8 @@ class ActiveProblemSession(Base):
     solved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relationships
-    user = relationship("User", back_populates="sessions")
-    problem = relationship("Problem", back_populates="sessions")
+    user = relationship("User", back_populates="sessions", lazy="selectin")
+    problem = relationship("Problem", back_populates="sessions", lazy="selectin")
 
     __table_args__ = (
         Index("ix_active_user_problem", "user_id", "problem_id", "status"),
