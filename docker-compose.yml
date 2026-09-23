@@ -34,7 +34,7 @@ services:
       postgres:
         condition: service_healthy
     env_file:
-      - ${ENV_FILE:-/etc/discord-cpe/.env}
+      - /etc/discord-cpe/.env
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres_password@postgres:5432/cpe_bot
     volumes:
