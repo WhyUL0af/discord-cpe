@@ -6,9 +6,9 @@ Wants=postgresql.service
 [Service]
 Type=simple
 User=ubuntu
-WorkingDirectory=/opt/discord-cpe
+WorkingDirectory=/opt/discord-cpe/current
 EnvironmentFile=/etc/discord-cpe/.env
-ExecStart=/opt/discord-cpe/.venv/bin/python main.py
+ExecStart=/opt/discord-cpe/current/.venv/bin/python main.py
 Restart=always
 RestartSec=5
 StandardOutput=journal

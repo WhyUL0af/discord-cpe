@@ -4,69 +4,70 @@
 
 ---
 
-## 方案 A：使用 Docker Compose 部署（強烈推薦）
+## 方案 A：使用 Docker Compose 部署（推薦，採 backup / release / current 架構）
 
-Docker Compose 可以自動處理 Python 環境、PostgreSQL 資料庫、容器依賴健康檢查與開機自動重啟，是最乾淨且不容易出錯的方式。
+採用業界標準的 Zero-Downtime 發布目錄結構：
 
-### Step 1. 將程式碼上傳至 Ubuntu 主機
-
-在您的本地電腦透過 Git 或 SCP 將專案傳至伺服器（建議放置於 `/opt/discord-cpe` 或使用者家目錄）：
-
-```bash
-# 方法 1：透過 Git Clone（推薦）
-git clone <你的_REPOSITORY_URL> /opt/discord-cpe
-cd /opt/discord-cpe
-
-# 或方法 2：透過 SCP 上傳本地資料夾
-scp -r c:\me\Projects\discord-cpe user@your-server-ip:/opt/discord-cpe
+```
+/opt/discord-cpe/
+├── current -> release/20260923_214500  # 指向當前正式運行的發布版本軟連結
+├── release/                            # 儲存歷史各時間戳記版本
+└── backup/                             # 部署前自動封存的快照與 DB Dump
+/etc/discord-cpe/
+└── .env                                # 外部共用敏感設定檔
 ```
 
-### Step 2. 設定環境變數於 `/etc/discord-cpe/.env`
-
-依據 Linux 系統組態規範，將敏感設定檔統一置於 `/etc/discord-cpe`：
+### Step 1. 建立伺服器目錄結構與配置 `/etc/discord-cpe/.env`
 
 ```bash
-# 1. 建立系統設定檔目錄
+# 1. 建立目錄結構並指派使用者權限
+sudo mkdir -p /opt/discord-cpe/{release,backup}
 sudo mkdir -p /etc/discord-cpe
+sudo chown -R $USER:$USER /opt/discord-cpe
 
-# 2. 將範本複製至 /etc/discord-cpe/.env
-sudo cp /opt/discord-cpe/.env.example /etc/discord-cpe/.env
-
-# 3. 嚴格鎖定權限（僅 root / 系統管理者可讀寫，保護 Token 不洩漏）
-sudo chmod 600 /etc/discord-cpe/.env
-
-# 4. 編輯設定檔填入你的 DISCORD_TOKEN
+# 2. 建立設定檔
 sudo nano /etc/discord-cpe/.env
 ```
 
-在 `/etc/discord-cpe/.env` 中確認以下項目：
+在 `/etc/discord-cpe/.env` 中填入你的設定：
 ```ini
-DISCORD_TOKEN=你的_DISCORD_BOT_TOKEN
-# DATABASE_URL 在 docker-compose 內部會自動指定，維持預設即可
+DISCORD_TOKEN=你的真實DiscordBotToken
 SUBMISSION_POLL_INTERVAL=20
 DAILY_REPEAT_COOLDOWN_DAYS=30
 AUTO_ARCHIVE_THREAD=false
 LOG_LEVEL=INFO
 ```
-
-### Step 3. 執行一鍵部署腳本（或手動執行 Compose）
-
-我們提供了自動安裝 Docker 並啟動容器的腳本：
-
+設定保護權限：
 ```bash
-chmod +x deploy.sh
-./deploy.sh
+sudo chmod 600 /etc/discord-cpe/.env
 ```
 
-*(若偏好手動操作，可執行：)*
-```bash
-# 安裝 docker 與 docker-compose-plugin（若尚未安裝）
-sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2
-sudo systemctl enable --now docker
+### Step 2. 第一次部署（建立首個 release 與 current）
 
-# 啟動服務（背景運行並自動建置映像）
+```bash
+# 1. 產生第一版發布
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+git clone https://github.com/WhyUL0af/discord-cpe.git /opt/discord-cpe/release/$TIMESTAMP
+
+# 2. 建立 current 軟連結指向該版本
+ln -sfn /opt/discord-cpe/release/$TIMESTAMP /opt/discord-cpe/current
+
+# 3. 進入 current 啟動容器
+cd /opt/discord-cpe/current
 docker compose up -d --build
 ```
+
+### Step 3. 後續自動化部署與回滾
+
+在 `/opt/discord-cpe/current` 內已附帶自動化腳本：
+- **發布新版本**：直接執行 `./deploy.sh`，會自動：
+  1. 備份上一版至 `/opt/discord-cpe/backup/`
+  2. 拉取最新代碼至 `/opt/discord-cpe/release/<新時間戳記>`
+  3. 平滑切換 `current` 軟連結並重新啟動容器
+  4. 清理並保留最新 5 個歷史版本
+- **快速回滾（Rollback）**：若新版本有問題，執行 `./rollback.sh` 即可瞬間將 `current` 切回上一版！
+
+
 
 ### Step 4. 檢查運行狀態與即時日誌
 
