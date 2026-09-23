@@ -1,0 +1,22 @@
+# Discord Bot
+discord.py>=2.3.2
+
+# Database & ORM
+SQLAlchemy>=2.0.30
+asyncpg>=0.29.0
+alembic>=1.13.0
+
+# HTTP Client & API
+httpx>=0.27.0
+
+# Configuration & Validation
+pydantic>=2.7.0
+pydantic-settings>=2.2.0
+python-dotenv>=1.0.1
+
+# Utilities & Tasks
+tzdata>=2024.1
+
+# Testing
+pytest>=8.2.0
+pytest-asyncio>=0.23.0

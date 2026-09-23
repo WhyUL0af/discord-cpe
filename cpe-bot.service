@@ -1,0 +1,18 @@
+[Unit]
+Description=CPE Discord Bot Service
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/discord-cpe
+EnvironmentFile=/opt/discord-cpe/.env
+ExecStart=/opt/discord-cpe/.venv/bin/python main.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
