@@ -44,6 +44,20 @@ class DailyRepository:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def get_by_message_id(
+        session: AsyncSession,
+        message_id: int
+    ) -> Optional[DailyProblem]:
+        """Fetch the daily problem associated with a discord message ID with eager-loaded problem."""
+        stmt = (
+            select(DailyProblem)
+            .where(DailyProblem.discord_message_id == message_id)
+            .options(selectinload(DailyProblem.problem))
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
     async def get_recent_problem_ids(
         session: AsyncSession,
         days: int,

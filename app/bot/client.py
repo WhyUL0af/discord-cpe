@@ -37,8 +37,9 @@ class CpeBot(commands.Bot):
                 logger.error(f"Failed to load extension {extension}: {e}", exc_info=True)
 
         # Register persistent views for button interactions across restarts
-        from app.bot.views.problem_view import PracticeCenterView
+        from app.bot.views.problem_view import DailyProblemView, PracticeCenterView
         self.add_view(PracticeCenterView())
+        self.add_view(DailyProblemView())
 
         logger.info("Syncing application commands with Discord...")
         try:

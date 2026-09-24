@@ -9,64 +9,10 @@ from app.database import get_db_session
 from app.models.guild import GuildSettings
 from app.models.problem import Problem
 from app.services.daily_service import DailyService
-from app.services.problem_service import ProblemService
-from app.bot.views.problem_view import ProblemActionView
+from app.bot.views.problem_view import DailyProblemView
 
 logger = logging.getLogger(__name__)
 
-
-class DailyProblemView(discord.ui.View):
-    def __init__(self, problem: Problem) -> None:
-        super().__init__(timeout=None)
-        self.problem = problem
-        self.problem_service = ProblemService()
-        self.daily_service = DailyService()
-
-        # Link button
-        if problem.external_url:
-            self.add_item(
-                discord.ui.Button(
-                    label="📖 查看題目",
-                    url=problem.external_url,
-                    style=discord.ButtonStyle.link,
-                )
-            )
-
-    @discord.ui.button(
-        label="💻 開始作答",
-        style=discord.ButtonStyle.success,
-        custom_id="cpe_daily_start_problem_button",
-    )
-    async def start_button(
-        self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button
-    ) -> None:
-        # Delegate to standard ProblemActionView logic
-        view = ProblemActionView(self.problem, self.problem_service)
-        await view.start_button(interaction, button)
-
-    @discord.ui.button(
-        label="📊 查看統計",
-        style=discord.ButtonStyle.secondary,
-        custom_id="cpe_daily_stats_button",
-    )
-    async def stats_button(
-        self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button
-    ) -> None:
-        await interaction.response.defer(ephemeral=True)
-        async with get_db_session() as session:
-            solved_today = await self.daily_service.count_solved_today(
-                session, self.problem.id
-            )
-            embed = discord.Embed(
-                title=f"📊 今日解題統計：UVa {self.problem.problem_number}",
-                description=f"今日已有 **{solved_today}** 位成員成功解答 (AC)！",
-                color=discord.Color.blue(),
-            )
-            await interaction.followup.send(embed=embed, ephemeral=True)
 
 
 class DailyProblemTask(commands.Cog):
