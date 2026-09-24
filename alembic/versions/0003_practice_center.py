@@ -1,6 +1,6 @@
 """Allow nullable thread_id and add practice_message_id to guild_settings
 
-Revision ID: 0003_practice_center_and_nullable_thread
+Revision ID: 0003_practice_center
 Revises: 0002_guild_daily_problems
 Create Date: 2026-09-24 00:00:00.000000
 
@@ -11,7 +11,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = "0003_practice_center_and_nullable_thread"
+revision: str = "0003_practice_center"
 down_revision: Union[str, None] = "0002_guild_daily_problems"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
