@@ -24,6 +24,16 @@ class ProblemNotFoundException(Exception):
     pass
 
 
+class ActiveSessionConflictException(Exception):
+    """Raised when user attempts to start a problem while having an active session on another problem."""
+
+    def __init__(self, active_session: ActiveProblemSession) -> None:
+        self.active_session = active_session
+        super().__init__(
+            f"User already has an active session for UVa {active_session.problem.problem_number if active_session.problem else active_session.problem_id}"
+        )
+
+
 class ProblemService:
     def __init__(
         self,
@@ -83,13 +93,24 @@ class ProblemService:
         if not problem:
             raise ProblemNotFoundException(f"找不到題目 UVa {problem_number}。")
 
-        # Check if an active session already exists for this user and problem
-        existing = await SessionRepository.get_active_session(session, user.id, problem.id)
-        if existing:
-            logger.info(
-                f"User {discord_user_id} already has active session for UVa {problem_number} (session_id={existing.id})"
-            )
-            return existing, False
+        # Check if an active session already exists for this user
+        current_active = await SessionRepository.get_latest_active_by_user(session, user.id)
+        if current_active:
+            if current_active.problem_id == problem.id:
+                logger.info(
+                    f"User {discord_user_id} already has active session for UVa {problem_number} (session_id={current_active.id})"
+                )
+                return current_active, False
+            else:
+                prob_desc = (
+                    f"UVa {current_active.problem.problem_number}"
+                    if current_active.problem
+                    else f"problem_id {current_active.problem_id}"
+                )
+                logger.info(
+                    f"User {discord_user_id} has active session conflict: already solving {prob_desc}, tried starting UVa {problem_number}"
+                )
+                raise ActiveSessionConflictException(current_active)
 
         # Get initial last_submission_id from uHunt to avoid re-notifying past submissions
         last_sub_id = 0

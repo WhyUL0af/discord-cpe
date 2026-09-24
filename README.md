@@ -193,31 +193,62 @@ alembic upgrade head
 
 ```
 📂 CPE
+├── 📢・cpe公告
 ├── 🎯・每日一題
 ├── 💻・刷題區
 ├── 🏆・排行榜
-└── 💬・題目討論
+├── 🏁・模擬考
+└── 💬・討論區
 ```
+
+### 建議 💻・刷題區 權限設定
+
+為了維持刷題區乾淨且保有個人隱私，推薦設定如下：
+
+- **@everyone**：
+  - 檢視頻道 (View Channel)：`允許 (Allow)`
+  - 讀取訊息歷史 (Read Message History)：`允許 (Allow)`
+  - 發送訊息 (Send Messages)：`拒絕 (Deny)`（一般成員無法隨意聊天洗頻）
+  - 建立公開/私人討論串 (Create Public/Private Threads)：`拒絕 (Deny)`
+  - 使用應用程式指令 (Use Application Commands)：`允許 (Allow)`
+- **CPE Bot**：
+  - 檢視頻道 (View Channel)：`允許 (Allow)`
+  - 發送訊息 (Send Messages)：`允許 (Allow)`
+  - 嵌入連結 (Embed Links)：`允許 (Allow)`
+  - 讀取訊息歷史 (Read Message History)：`允許 (Allow)`
+
+> [!NOTE]
+> 💻・刷題區由所有成員共用，常駐一則「💻 CPE 刷題中心」互動面板。所有題目的抽題、作答進度與解題紀錄皆為 **個人專屬 (Ephemeral)**，提交評測結果直接由 **Discord 私訊 (DM)** 寄送給本人。若需要發言討論題目，請前往 **💬・討論區**。
 
 加入伺服器後，具有**管理員權限**的成員執行 `/setup` 綁定頻道：
 
 ```
-/setup daily_channel:#🎯・每日一題 practice_channel:#💻・刷題區 ranking_channel:#🏆・排行榜 discussion_channel:#💬・題目討論 archive_on_solve:false
+/setup daily_channel:#🎯・每日一題 practice_channel:#💻・刷題區 ranking_channel:#🏆・排行榜 discussion_channel:#💬・題目討論
 ```
 
+- **刷題區**：設定後 Bot 會自動在此建立或維護常駐的「💻 CPE 刷題中心」訊息，重啟時會自動檢查並沿用（edit/reuse），被刪除則自動補建。
 - **每日一題頻道**：每天固定時間發布一則挑戰題，並提供快捷作答按鈕。
-- **刷題區**：使用者調用 `/problem` 或點擊按鈕時自動建立個人作答 Thread 的主要入口。
 - **排行榜頻道**：Bot 會發送一則常駐排行榜訊息，日後透過 `message.edit()` 自動更新，不洗頻。
 
 ---
 
 ## 9. Slash Commands 指令全覽
 
-| 指令 | 說明 | 範例 |
+所有個人相關查詢與操作均使用 **Ephemeral（僅本人可見）** 回覆：
+
+| 指令 | 說明 | 隱私模式 |
 |---|---|---|
-| `/setup` | 設定伺服器各專用頻道（僅管理員可用） | `/setup daily_channel:#每日一題` |
-| `/link <uva_username>` | 驗證並綁定個人 UVa 帳號 | `/link WhyUL0af` |
-| `/unlink` | 解除目前 Discord 帳號所綁定的 UVa 帳號 | `/unlink` |
+| `/setup` | 設定伺服器各專用頻道（僅管理員可用） | Ephemeral |
+| `/practice_center` | 手動重新發布或維護「CPE 刷題中心」常駐訊息（僅管理員可用） | Ephemeral |
+| `/link <uva_username>` | 驗證並綁定個人 UVa 帳號 | 公開回覆 / 成功 Embed |
+| `/unlink` | 解除目前 Discord 帳號所綁定的 UVa 帳號 | Ephemeral |
+| `/profile [member]` | 查詢 UVa 解題數、提交數與世界排名數據 | Ephemeral / 公開 |
+| `/cpe random` | 隨機抽取一題 CPE 題目 | **Ephemeral (僅本人可見)** |
+| `/cpe easy` | 隨機抽取一題 CPE 一星精選題目（⭐） | **Ephemeral (僅本人可見)** |
+| `/cpe problem <num>` | 指定 UVa 題號取得題目卡片 | **Ephemeral (僅本人可見)** |
+| `/cpe current` (或 `/status`) | 檢視目前正在進行中的題目、歷時與最新 5 筆提交紀錄 | **Ephemeral (僅本人可見)** |
+| `/cpe solved` (或 `/solved`) | 檢視個人已完成題目總數與清單 | **Ephemeral (僅本人可見)** |
+| `/rank weekly`, `/rank all` | 查詢本週或歷史解題排行榜 | 公開 Embed |
 | `/profile [member]` | 查看個人或指定成員的 UVa 解題與提交統計數據 | `/profile` 或 `/profile member:@Alex` |
 | `/problem random` | 隨機取得一題 CPE 題目 | `/problem random` |
 | `/problem number <num>` | 根據題號精準取得題目 | `/problem number 100` |

@@ -51,3 +51,11 @@ class CpeBot(commands.Bot):
         if self.user:
             logger.info(f"Logged in as {self.user} (ID: {self.user.id})")
         logger.info("CPE Discord Bot is online and ready.")
+
+        # Sync/verify persistent practice center messages for all connected guilds
+        from app.bot.commands.setup_cog import deploy_or_sync_practice_center
+        for guild in self.guilds:
+            try:
+                await deploy_or_sync_practice_center(self, guild.id)
+            except Exception as e:
+                logger.warning(f"Could not auto-sync practice center in guild {guild.id}: {e}")

@@ -11,41 +11,60 @@ from app.bot.views.problem_view import PracticeCenterView, create_practice_cente
 logger = logging.getLogger(__name__)
 
 
-class SetupCog(commands.Cog):
-    def __init__(self, bot: commands.Bot) -> None:
-        self.bot = bot
-        self.guild_service = GuildService()
+from app.repositories.guild_repo import GuildRepository
 
-    async def _deploy_practice_center(
-        self,
-        session,
-        guild: discord.Guild,
-        practice_channel: discord.TextChannel,
-        current_msg_id: Optional[int],
-    ) -> Optional[int]:
-        """Deploy or update the persistent practice center message."""
+
+async def deploy_or_sync_practice_center(
+    bot: commands.Bot,
+    guild_id: int,
+) -> Optional[int]:
+    """Ensure the persistent practice center message exists in the configured practice channel.
+    If message exists: edit / reuse.
+    If message deleted or missing: recreate and update practice_message_id in guild_settings.
+    """
+    async with get_db_session() as session:
+        settings = await GuildRepository.get_by_id(session, guild_id)
+        if not settings or not settings.practice_channel_id:
+            return None
+
+        channel = bot.get_channel(settings.practice_channel_id)
+        if not channel:
+            try:
+                channel = await bot.fetch_channel(settings.practice_channel_id)
+            except Exception:
+                return None
+
+        if not isinstance(channel, discord.TextChannel):
+            return None
+
         center_embed = create_practice_center_embed()
         center_view = PracticeCenterView()
 
         msg = None
-        if current_msg_id:
+        if settings.practice_message_id:
             try:
-                msg = await practice_channel.fetch_message(current_msg_id)
+                msg = await channel.fetch_message(settings.practice_message_id)
                 await msg.edit(embed=center_embed, view=center_view)
-                logger.info(f"Updated persistent practice center message {current_msg_id} in {practice_channel.id}")
-            except Exception:
+                logger.info(f"Reused and updated persistent practice center message {msg.id} in guild {guild_id}")
+                return msg.id
+            except (discord.NotFound, discord.HTTPException):
                 msg = None
 
         if not msg:
             try:
-                msg = await practice_channel.send(embed=center_embed, view=center_view)
-                await self.guild_service.set_practice_message(session, guild.id, msg.id)
-                logger.info(f"Posted new persistent practice center message {msg.id} in {practice_channel.id}")
+                msg = await channel.send(embed=center_embed, view=center_view)
+                await GuildRepository.update_practice_message_id(session, guild_id, msg.id)
+                logger.info(f"Created new persistent practice center message {msg.id} in guild {guild_id}")
+                return msg.id
             except Exception as e:
-                logger.warning(f"Could not post practice center message to channel {practice_channel.id}: {e}")
+                logger.warning(f"Could not post practice center message in guild {guild_id}: {e}")
                 return None
 
-        return msg.id
+
+class SetupCog(commands.Cog):
+    def __init__(self, bot: commands.Bot) -> None:
+        self.bot = bot
+        self.guild_service = GuildService()
 
     @app_commands.command(name="setup", description="設定 CPE Bot 於此伺服器的各功能頻道（僅管理員可用）")
     @app_commands.describe(
@@ -93,20 +112,7 @@ class SetupCog(commands.Cog):
 
             # Auto-deploy or update practice center message if practice channel is configured
             if settings.practice_channel_id:
-                p_chan = interaction.guild.get_channel(settings.practice_channel_id)
-                if not p_chan:
-                    try:
-                        p_chan = await interaction.guild.fetch_channel(settings.practice_channel_id)
-                    except Exception:
-                        p_chan = None
-
-                if isinstance(p_chan, discord.TextChannel):
-                    await self._deploy_practice_center(
-                        session=session,
-                        guild=interaction.guild,
-                        practice_channel=p_chan,
-                        current_msg_id=settings.practice_message_id,
-                    )
+                await deploy_or_sync_practice_center(self.bot, interaction.guild_id)
 
             embed = discord.Embed(
                 title="⚙️ CPE Discord Bot 伺服器設定",
@@ -140,26 +146,10 @@ class SetupCog(commands.Cog):
                 await interaction.followup.send("⚠️ 尚未設定刷題區頻道，請先使用 `/setup practice_channel:#頻道` 設定。", ephemeral=True)
                 return
 
-            p_chan = interaction.guild.get_channel(settings.practice_channel_id)
-            if not p_chan:
-                try:
-                    p_chan = await interaction.guild.fetch_channel(settings.practice_channel_id)
-                except Exception:
-                    p_chan = None
-
-            if not isinstance(p_chan, discord.TextChannel):
-                await interaction.followup.send("❌ 找不到設定的刷題區文字頻道。", ephemeral=True)
-                return
-
-            msg_id = await self._deploy_practice_center(
-                session=session,
-                guild=interaction.guild,
-                practice_channel=p_chan,
-                current_msg_id=settings.practice_message_id,
-            )
+            msg_id = await deploy_or_sync_practice_center(self.bot, interaction.guild_id)
 
             if msg_id:
-                await interaction.followup.send(f"✅ 已成功在 <#{p_chan.id}> 發布/更新「CPE 刷題中心」常駐訊息！", ephemeral=True)
+                await interaction.followup.send(f"✅ 已成功在 <#{settings.practice_channel_id}> 發布/更新「CPE 刷題中心」常駐訊息！", ephemeral=True)
             else:
                 await interaction.followup.send("❌ 發布訊息失敗，請確認機器人擁有該頻道的發言與嵌入權限。", ephemeral=True)
 

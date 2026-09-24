@@ -35,6 +35,7 @@ sudo docker compose up -d --build
 - **自動化發布新版本**：
   在 `/opt/discord-cpe/current` 下執行：
   ```bash
+  chmod +x deploy.sh rollback.sh  # 若權限不足可先補上執行權限
   ./deploy.sh
   ```
   （會自動備份舊版本、拉取新代碼至新 release 目錄、切換 `current` 軟連結並重新建置容器）

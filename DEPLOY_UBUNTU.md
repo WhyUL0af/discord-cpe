@@ -59,7 +59,7 @@ sudo docker compose up -d --build
 
 ### Step 3. 後續自動化部署與回滾
 
-在 `/opt/discord-cpe/current` 內已附帶自動化腳本：
+在 `/opt/discord-cpe/current` 內已附帶自動化腳本（初次若無執行權限可先執行 `chmod +x deploy.sh rollback.sh`）：
 - **發布新版本**：直接執行 `./deploy.sh`，會自動：
   1. 備份上一版至 `/opt/discord-cpe/backup/`
   2. 拉取最新代碼至 `/opt/discord-cpe/release/<新時間戳記>`

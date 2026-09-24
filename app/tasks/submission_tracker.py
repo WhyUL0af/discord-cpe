@@ -99,21 +99,22 @@ class SubmissionTracker(commands.Cog):
                         solve_time_str = f"{elapsed_seconds} 秒"
 
                 embed = discord.Embed(
-                    title="🎉 恭喜 Accepted (AC)！",
-                    description=f"你已成功解開 **UVa {notif.problem_number} - {notif.problem_title}**！",
+                    title="✅ Accepted!",
+                    description=f"**UVa {notif.problem_number}**\n{notif.problem_title}",
                     color=discord.Color.green(),
                 )
+                embed.add_field(name="Attempts", value=str(notif.attempts), inline=True)
+                embed.add_field(name="作答時間", value=solve_time_str, inline=True)
                 embed.add_field(name="Submission ID", value=str(notif.submission_id), inline=True)
                 embed.add_field(name="語言", value=notif.language, inline=True)
-                embed.add_field(name="執行時間", value=f"{notif.runtime} ms" if notif.runtime is not None else "N/A", inline=True)
-                embed.add_field(name="嘗試次數", value=f"{notif.attempts} 次", inline=True)
-                embed.add_field(name="作答歷時", value=solve_time_str, inline=True)
-                embed.set_footer(text="本題已自動計入解題紀錄與排行榜！快至刷題中心挑選下一題吧！")
+                if notif.runtime is not None:
+                    embed.add_field(name="執行時間", value=f"{notif.runtime} ms", inline=True)
+                embed.set_footer(text="本題已自動計入解題紀錄與排行榜！")
 
             elif notif.verdict == "In queue":
                 embed = discord.Embed(
-                    title="⏳ 評測中...",
-                    description=f"題目：**UVa {notif.problem_number} - {notif.problem_title}**\n\n系統已偵測到提交，正在等待 UVa 評測結果。",
+                    title="⏳ In Queue",
+                    description=f"**UVa {notif.problem_number}**\n{notif.problem_title}\n\n正在等待評測結果...",
                     color=discord.Color.gold(),
                 )
                 embed.add_field(name="Submission ID", value=str(notif.submission_id), inline=True)
@@ -122,14 +123,14 @@ class SubmissionTracker(commands.Cog):
             else:
                 embed = discord.Embed(
                     title=notif.display_verdict,
-                    description=f"題目：**UVa {notif.problem_number} - {notif.problem_title}**",
+                    description=f"**UVa {notif.problem_number}**\n{notif.problem_title}",
                     color=discord.Color.red(),
                 )
+                embed.add_field(name="Attempts", value=str(notif.attempts), inline=True)
                 embed.add_field(name="Submission ID", value=str(notif.submission_id), inline=True)
                 embed.add_field(name="語言", value=notif.language, inline=True)
                 if notif.runtime is not None and notif.runtime > 0:
                     embed.add_field(name="執行時間", value=f"{notif.runtime} ms", inline=True)
-                embed.add_field(name="嘗試次數", value=f"第 {notif.attempts} 次嘗試", inline=True)
                 embed.set_footer(text="不要氣餒，檢查邏輯或測資後再次提交！")
 
             try:

@@ -8,24 +8,40 @@ from app.models.problem import Problem
 from app.models.session import ActiveProblemSession
 from app.models.submission import Submission
 from app.repositories.submission_repo import SubmissionRepository
-from app.services.problem_service import ProblemService, UserNotLinkedException
+from app.services.problem_service import (
+    ActiveSessionConflictException,
+    ProblemService,
+    UserNotLinkedException,
+)
 from app.services.submission_service import SubmissionService
 
 logger = logging.getLogger(__name__)
 
+VERDICT_MAP_DISPLAY = {
+    "Accepted": ("✅", "Accepted"),
+    "Wrong Answer": ("❌", "Wrong Answer"),
+    "Time Limit Exceeded": ("⏱", "Time Limit Exceeded"),
+    "Compilation Error": ("🛠", "Compilation Error"),
+    "Runtime Error": ("💥", "Runtime Error"),
+    "Memory Limit Exceeded": ("💾", "Memory Limit Exceeded"),
+    "Output Limit Exceeded": ("📄", "Output Limit Exceeded"),
+    "Presentation Error": ("📝", "Presentation Error"),
+    "In queue": ("⏳", "In Queue"),
+}
+
 
 def create_problem_embed(problem: Problem) -> discord.Embed:
-    diff = problem.difficulty or "Unknown"
+    diff = problem.difficulty or "⭐"
     embed = discord.Embed(
-        title=f"📘 UVa {problem.problem_number}",
-        description=f"**{problem.title}**",
+        title="🎲 你的題目",
+        description=f"**UVa {problem.problem_number}**\n{problem.title}\n\n難度：{diff}",
         color=discord.Color.blue(),
     )
-    embed.add_field(name="Difficulty：", value=diff, inline=True)
-    embed.add_field(name="Source：", value=problem.source or "UVa Online Judge", inline=True)
     if problem.time_limit:
-        embed.add_field(name="Time Limit：", value=f"{problem.time_limit} ms", inline=True)
-    embed.set_footer(text="點擊「📖 查看題目」開啟題目，點擊「💻 開始作答」記錄作答狀態。")
+        embed.add_field(name="Time Limit", value=f"{problem.time_limit} ms", inline=True)
+    if problem.source:
+        embed.add_field(name="Source", value=problem.source, inline=True)
+    embed.set_footer(text="點擊「🌐 查看題目」開啟題目，點擊「▶ 開始作答」記錄作答。")
     return embed
 
 
@@ -48,7 +64,7 @@ def create_current_problem_embed(
     recent_submissions: List[Submission],
 ) -> discord.Embed:
     started_str = (
-        active_session.started_at.strftime("%Y-%m-%d %H:%M UTC")
+        active_session.started_at.strftime("%H:%M")
         if active_session.started_at
         else "剛才"
     )
@@ -59,33 +75,26 @@ def create_current_problem_embed(
     )
 
     embed = discord.Embed(
-        title="🎯 目前作答題目",
-        description=f"### UVa {problem.problem_number} - {problem.title}",
+        title="📌 目前作答",
+        description=f"**UVa {problem.problem_number}**\n{problem.title}",
         color=discord.Color.purple(),
     )
-    embed.add_field(name="難度", value=problem.difficulty or "Unknown", inline=True)
+    embed.add_field(name="難度", value=problem.difficulty or "⭐", inline=True)
     embed.add_field(name="開始時間", value=started_str, inline=True)
-    embed.add_field(name="作答歷時", value=elapsed_str, inline=True)
-    embed.add_field(name="嘗試次數", value=f"{attempts} 次", inline=True)
-    embed.add_field(name="狀態", value="🟢 進行中 (Solving)", inline=True)
+    embed.add_field(name="作答時間", value=elapsed_str, inline=True)
+    embed.add_field(name="Attempts", value=str(attempts), inline=True)
 
     if recent_submissions:
         sub_lines = []
         for s in recent_submissions:
             time_str = s.submitted_at.strftime("%H:%M") if s.submitted_at else ""
-            runtime_str = f" ({s.runtime} ms)" if s.runtime is not None else ""
-            if s.verdict == "Accepted":
-                emoji = "✅"
-            elif s.verdict == "In queue":
-                emoji = "⏳"
-            else:
-                emoji = "❌"
-            sub_lines.append(f"• {emoji} {s.verdict}{runtime_str} {time_str}")
+            emoji, verdict_name = VERDICT_MAP_DISPLAY.get(s.verdict, ("❓", s.verdict))
+            sub_lines.append(f"{emoji} {verdict_name} — {time_str}")
         sub_text = "\n".join(sub_lines)
     else:
         sub_text = "尚未有提交紀錄"
 
-    embed.add_field(name="最近提交紀錄", value=sub_text, inline=False)
+    embed.add_field(name="最近提交", value=sub_text, inline=False)
     embed.set_footer(text="在 UVa 提交後點擊「重新整理」更新狀態，或點擊「結束作答」。")
     return embed
 
@@ -93,17 +102,7 @@ def create_current_problem_embed(
 def create_practice_center_embed() -> discord.Embed:
     embed = discord.Embed(
         title="💻 CPE 刷題中心",
-        description=(
-            "歡迎來到 **CPE 刷題中心**！\n\n"
-            "請點擊下方按鈕選擇題目開始練習：\n"
-            "• **🎲 隨機題目**：從題庫隨機抽取題目\n"
-            "• **⭐ 一星題目**：抽取 CPE 歷屆一星精选题\n"
-            "• **🔎 指定題目**：輸入特定 UVa 題號\n"
-            "• **📌 目前題目**：查看正在進行中的題目與提交紀錄\n"
-            "• **📚 已解題目**：查看你的已解答題目清單\n\n"
-            "🔒 **隱私說明**：所有操作與題目卡片皆為個人專屬 (Ephemeral)，不會洗版頻道。\n"
-            "📬 **評測通知**：在 UVa 提交後，系統將透過 **Discord 私訊 (DM)** 即時通知評測結果！"
-        ),
+        description="在這裡進行 CPE 題目練習。\n你的題目、作答紀錄與提交結果只有你自己能看到。",
         color=discord.Color.blue(),
     )
     embed.set_footer(text="CPE Discord Bot ｜ 提升程式能力，輕鬆應考 CPE")
@@ -127,14 +126,14 @@ class ProblemSelectionView(discord.ui.View):
         if problem.external_url:
             self.add_item(
                 discord.ui.Button(
-                    label="📖 查看題目",
+                    label="🌐 查看題目",
                     url=problem.external_url,
                     style=discord.ButtonStyle.link,
                 )
             )
 
     @discord.ui.button(
-        label="💻 開始作答",
+        label="▶ 開始作答",
         style=discord.ButtonStyle.success,
         custom_id="cpe_select_start",
     )
@@ -162,10 +161,26 @@ class ProblemSelectionView(discord.ui.View):
                     )
                 else:
                     await interaction.followup.send(
-                        f"ℹ️ 你已經有進行中的 **UVa {self.problem.problem_number}** 作答！\n"
-                        f"系統持續追蹤提交中，可使用 `/cpe current` 查看進度。",
+                        f"ℹ️ 你已經在作答 **UVa {self.problem.problem_number}**！\n"
+                        f"系統持續追蹤提交中，可使用 `/status` 或點選「📌 目前作答」查看進度。",
                         ephemeral=True,
                     )
+            except ActiveSessionConflictException as conflict:
+                active_prob = conflict.active_session.problem
+                prob_title = active_prob.title if active_prob else ""
+                prob_num = active_prob.problem_number if active_prob else conflict.active_session.problem_id
+                embed = discord.Embed(
+                    title="⚠️ 你目前正在作答其他題目",
+                    description=(
+                        f"你目前正在作答：\n\n"
+                        f"**UVa {prob_num} - {prob_title}**\n\n"
+                        f"每位使用者同時只能有一題進行中的題目。\n"
+                        f"請先完成或結束目前的作答，才能開始新題目！"
+                    ),
+                    color=discord.Color.orange(),
+                )
+                view = ActiveConflictView(conflict.active_session, self.problem_service)
+                await interaction.followup.send(embed=embed, view=view, ephemeral=True)
             except UserNotLinkedException:
                 await interaction.followup.send(
                     "⚠️ 尚未綁定 UVa Account\n請先使用 `/link <uva_username>` 完成帳號綁定。",
@@ -206,8 +221,74 @@ class ProblemSelectionView(discord.ui.View):
 ProblemActionView = ProblemSelectionView
 
 
+class ActiveConflictView(discord.ui.View):
+    """View rendered when user attempts to start a problem while already solving another."""
+
+    def __init__(
+        self,
+        active_session: ActiveProblemSession,
+        problem_service: Optional[ProblemService] = None,
+        submission_service: Optional[SubmissionService] = None,
+    ) -> None:
+        super().__init__(timeout=180)
+        self.active_session = active_session
+        self.problem_service = problem_service or ProblemService()
+        self.submission_service = submission_service or SubmissionService()
+
+    @discord.ui.button(
+        label="📌 查看目前作答",
+        style=discord.ButtonStyle.primary,
+        custom_id="cpe_conflict_view",
+    )
+    async def view_button(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ) -> None:
+        await interaction.response.defer(ephemeral=True)
+        async with get_db_session() as session:
+            active = await self.problem_service.get_active_session_by_user(
+                session, interaction.user.id
+            )
+            if not active or not active.problem:
+                await interaction.followup.send("🎯 目前沒有進行中的題目。", ephemeral=True)
+                return
+
+            prob = active.problem
+            attempts = await SubmissionRepository.count_attempts(session, active.user_id, prob.id)
+            recent_subs = await SubmissionRepository.get_recent_submissions_for_problem(
+                session, active.user_id, prob.id, limit=5
+            )
+            embed = create_current_problem_embed(prob, active, attempts, recent_subs)
+            view = CurrentProblemView(prob, self.problem_service, self.submission_service)
+            await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+
+    @discord.ui.button(
+        label="⏹ 結束目前作答",
+        style=discord.ButtonStyle.danger,
+        custom_id="cpe_conflict_close",
+    )
+    async def close_button(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ) -> None:
+        await interaction.response.defer(ephemeral=True)
+        async with get_db_session() as session:
+            closed = await self.problem_service.close_problem_session(
+                session, interaction.user.id
+            )
+            if closed:
+                await interaction.followup.send(
+                    "⏹ 已成功結束目前作答！你現在可以重新點擊「▶ 開始作答」開始新題目。",
+                    ephemeral=True,
+                )
+            else:
+                await interaction.followup.send("🎯 目前沒有進行中的作答可結束。", ephemeral=True)
+
+
 class CurrentProblemView(discord.ui.View):
-    """View attached to /cpe current or [📌 目前題目] embed."""
+    """View attached to /status or [📌 目前作答] embed."""
 
     def __init__(
         self,
@@ -223,7 +304,7 @@ class CurrentProblemView(discord.ui.View):
         if problem.external_url:
             self.add_item(
                 discord.ui.Button(
-                    label="📖 查看題目",
+                    label="🌐 查看題目",
                     url=problem.external_url,
                     style=discord.ButtonStyle.link,
                 )
@@ -292,7 +373,7 @@ class CurrentProblemView(discord.ui.View):
                 )
 
 
-class ProblemSearchModal(discord.ui.Modal, title="🔎 指定 UVa 題號"):
+class ProblemSearchModal(discord.ui.Modal, title="🔎 指定題目"):
     problem_input = discord.ui.TextInput(
         label="UVa 題號",
         placeholder="例如: 100, 10041, 10107",
@@ -318,7 +399,7 @@ class ProblemSearchModal(discord.ui.Modal, title="🔎 指定 UVa 題號"):
             problem = await self.problem_service.get_problem(session, problem_number)
             if not problem:
                 await interaction.followup.send(
-                    f"❌ 找不到題目 UVa {problem_number}，請確認題號是否正確。",
+                    f"找不到 UVa {problem_number}，\n請確認題號是否正確。",
                     ephemeral=True,
                 )
                 return
@@ -341,7 +422,7 @@ class PracticeCenterView(discord.ui.View):
         self.submission_service = submission_service or SubmissionService()
 
     @discord.ui.button(
-        label="🎲 隨機題目",
+        label="🎲 隨機一題",
         style=discord.ButtonStyle.primary,
         custom_id="cpe_practice_random",
     )
@@ -362,7 +443,7 @@ class PracticeCenterView(discord.ui.View):
             await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
     @discord.ui.button(
-        label="⭐ 一星題目",
+        label="⭐ 一星題",
         style=discord.ButtonStyle.success,
         custom_id="cpe_practice_easy",
     )
@@ -395,7 +476,7 @@ class PracticeCenterView(discord.ui.View):
         await interaction.response.send_modal(ProblemSearchModal(self.problem_service))
 
     @discord.ui.button(
-        label="📌 目前題目",
+        label="📌 目前作答",
         style=discord.ButtonStyle.secondary,
         custom_id="cpe_practice_current",
     )
@@ -411,7 +492,7 @@ class PracticeCenterView(discord.ui.View):
             )
             if not active or not active.problem:
                 await interaction.followup.send(
-                    "🎯 目前沒有進行中的題目。\n快點選「🎲 隨機題目」或「⭐ 一星題目」開啟練習吧！",
+                    "🎯 目前沒有進行中的題目。\n快點選「🎲 隨機一題」或「⭐ 一星題」開啟練習吧！",
                     ephemeral=True,
                 )
                 return
@@ -426,7 +507,7 @@ class PracticeCenterView(discord.ui.View):
             await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
     @discord.ui.button(
-        label="📚 已解題目",
+        label="✅ 已完成題目",
         style=discord.ButtonStyle.secondary,
         custom_id="cpe_practice_solved",
     )
@@ -443,19 +524,17 @@ class PracticeCenterView(discord.ui.View):
             )
 
             embed = discord.Embed(
-                title=f"📚 {interaction.user.display_name} 的已解題目",
+                title="✅ 我的 CPE 解題紀錄",
                 color=discord.Color.dark_green(),
             )
 
             if not solved_list:
-                embed.description = "目前尚未解開任何題目。\n點擊「🎲 隨機題目」開始練習！"
-                embed.add_field(name="已解總數", value="0 題", inline=False)
+                embed.description = "已完成：0 題\n\n目前尚未解開任何題目。\n點擊「🎲 隨機一題」開始練習！"
             else:
-                lines = [f"{idx}. UVa {num} - {title}" for idx, (num, title) in enumerate(solved_list, 1)]
-                desc = "\n".join(lines[:25])
+                lines = [f"UVa {num} - {title}" for (num, title) in solved_list]
+                desc = f"已完成：{len(solved_list)} 題\n\n" + "\n".join(lines[:25])
                 if len(lines) > 25:
                     desc += f"\n... 等共 {len(lines)} 題"
                 embed.description = desc
-                embed.add_field(name="已解總數", value=f"{len(solved_list)} 題", inline=False)
 
             await interaction.followup.send(embed=embed, ephemeral=True)
