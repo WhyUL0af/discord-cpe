@@ -1,6 +1,7 @@
-from datetime import date
+from datetime import datetime, time
 import logging
 from typing import Optional
+from zoneinfo import ZoneInfo
 import discord
 from discord.ext import commands, tasks
 from sqlalchemy import select
@@ -12,6 +13,8 @@ from app.services.daily_service import DailyService
 from app.bot.views.problem_view import DailyProblemView
 
 logger = logging.getLogger(__name__)
+DAILY_TIMEZONE = ZoneInfo("Asia/Taipei")
+DAILY_POST_TIME = time(7, 0, tzinfo=DAILY_TIMEZONE)
 
 
 
@@ -26,10 +29,16 @@ class DailyProblemTask(commands.Cog):
     def cog_unload(self) -> None:
         self.daily_loop.cancel()
 
-    @tasks.loop(minutes=10)
+    @tasks.loop(time=DAILY_POST_TIME)
     async def daily_loop(self) -> None:
-        """Check every 10 minutes if today's daily problem needs to be posted for each configured guild."""
-        today = date.today()
+        await self.post_due_daily_problem()
+
+    async def post_due_daily_problem(self) -> None:
+        """Post once per Taipei day after 07:00, including after a late restart."""
+        now = datetime.now(DAILY_TIMEZONE)
+        if now.hour < 7:
+            return
+        today = now.date()
 
         try:
             async with get_db_session() as session:
@@ -97,6 +106,7 @@ class DailyProblemTask(commands.Cog):
     async def before_daily_loop(self) -> None:
         await self.bot.wait_until_ready()
         logger.info("DailyProblemTask started.")
+        await self.post_due_daily_problem()
 
 
 async def setup(bot: commands.Bot) -> None:
