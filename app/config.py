@@ -20,6 +20,7 @@ def get_default_env_file() -> str:
 class Settings(BaseSettings):
     # Discord Configuration
     DISCORD_TOKEN: str = ""
+    DISCORD_LINKED_ROLE_ID: int = 0
 
     @field_validator("DISCORD_TOKEN", mode="before")
     def clean_token(cls, v: str) -> str:
