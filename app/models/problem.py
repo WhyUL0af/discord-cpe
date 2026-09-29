@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from typing import Optional
-from sqlalchemy import BigInteger, DateTime, Integer, String
+from sqlalchemy import BigInteger, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -18,9 +18,18 @@ class Problem(Base):
     uhunt_pid: Mapped[Optional[int]] = mapped_column(Integer, unique=True, index=True, nullable=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     difficulty: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    category: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     source: Mapped[str] = mapped_column(String(100), default="UVa Online Judge", nullable=False)
     external_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     time_limit: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # in milliseconds
+    memory_limit: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # in KB
+    statement: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    input_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    output_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    sample_input: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    sample_output: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    test_cases: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON array, managed by trusted operators
+    discussion_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

@@ -1,0 +1,11 @@
+:root[data-theme=light]{color-scheme:light;--bg:#f5f6f8;--panel:#fff;--line:#d4d8df;--text:#20242c;--muted:#596273;--accent:#226330}
+@media(prefers-color-scheme:light){:root:not([data-theme]){color-scheme:light;--bg:#f5f6f8;--panel:#fff;--line:#d4d8df;--text:#20242c;--muted:#596273;--accent:#226330}}
+header{background:var(--bg)}pre,textarea{background:var(--bg);color:var(--text)}button,select,input{background:var(--panel);color:var(--text);border-color:var(--line)}
+a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+button:disabled{opacity:.5;cursor:wait}.mock-notice{padding:8px 16px;border:1px solid #a47936;color:var(--text);font-size:13px}
+body:has(.workspace) main{max-width:1600px;margin:12px auto;padding:0 12px}.workspace{display:grid;grid-template-columns:minmax(300px,45fr) minmax(340px,55fr);grid-template-rows:minmax(300px,1fr) minmax(180px,.45fr);height:calc(100dvh - 140px);min-height:550px;border:1px solid var(--line)}
+.workspace h1{font-size:22px}.workspace h2{font-size:17px;margin-top:24px}.problem-pane{grid-row:1/3;overflow:auto;padding:16px;border-right:1px solid var(--line);background:var(--panel)}
+.code-pane{min-width:0;min-height:0;display:flex;flex-direction:column;padding:0 12px}.code-pane #editor{flex:1;height:auto;min-height:240px;border:0}.code-pane #editor-fallback{flex:1;font:14px/1.6 monospace;resize:none}
+.console-pane{grid-column:2;overflow:auto;border-top:1px solid var(--line);padding:0 12px}.console-pane pre{margin:6px 0;font-size:13px}.console-pane textarea{min-height:65px;height:85px}
+.actions{flex-wrap:wrap}.workspace-tabs{display:none}[hidden]{display:none!important}.table-scroll{overflow-x:auto}.submission-code{white-space:pre;max-height:60vh;overflow:auto}
+@media(max-width:800px){.workspace-tabs{display:flex;gap:8px;margin-bottom:8px}.workspace{display:block;height:auto;min-height:0}.workspace .problem-pane,.workspace .code-pane,.workspace .console-pane{display:none;border:0}.workspace[data-view=problem] .problem-pane{display:block}.workspace[data-view=code] .code-pane{display:flex;height:70dvh}.workspace[data-view=result] .console-pane{display:block;min-height:50dvh}.problem-pane{overflow:visible}.workspace-tabs button[aria-pressed=true]{border-color:var(--accent)}}

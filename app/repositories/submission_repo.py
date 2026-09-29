@@ -8,6 +8,15 @@ from app.models.submission import Submission
 
 class SubmissionRepository:
     @staticmethod
+    async def get_owned(session: AsyncSession, submission_id: int, user_id: int):
+        return await session.scalar(select(Submission).where(Submission.id == submission_id, Submission.user_id == user_id))
+
+    @staticmethod
+    async def list_owned(session: AsyncSession, user_id: int):
+        return list((await session.scalars(select(Submission).where(Submission.user_id == user_id)
+                    .order_by(Submission.submitted_at.desc(), Submission.id.desc()).limit(200))).all())
+
+    @staticmethod
     async def get_by_external_id(
         session: AsyncSession,
         external_submission_id: int

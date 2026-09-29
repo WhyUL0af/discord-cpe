@@ -29,7 +29,7 @@ class SubmissionNotification(NamedTuple):
     runtime: Optional[int]
     attempts: int
     is_accepted: bool
-    started_at: datetime
+    started_at: Optional[datetime]
     solved_at: Optional[datetime] = None
     thread_id: Optional[int] = None
 
@@ -144,8 +144,13 @@ class SubmissionService:
         if not user:
             return []
 
-        solved_list = await SolvedRepository.get_user_solved_problems(session, user.id)
-        return [(s.problem.problem_number, s.problem.title) for s in solved_list]
+        from sqlalchemy import select
+        result = await session.execute(select(Problem.problem_number, Problem.title)
+            .join(Submission, Submission.problem_id == Problem.id)
+            .where(Submission.user_id == user.id, Submission.source == "uhunt",
+                   Submission.external_submission_id.isnot(None), Submission.verdict == "Accepted")
+            .distinct().order_by(Problem.problem_number))
+        return [(row[0], row[1]) for row in result.all()]
 
     async def get_recent_submissions_for_problem(
         self,

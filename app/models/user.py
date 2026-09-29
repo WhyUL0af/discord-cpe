@@ -15,6 +15,7 @@ class User(Base):
     )
     discord_user_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True, nullable=False)
     discord_username: Mapped[str] = mapped_column(String(64), nullable=True)
+    discord_avatar: Mapped[str] = mapped_column(String(255), nullable=True)
     uva_username: Mapped[str] = mapped_column(String(64), nullable=True, index=True)
     uva_user_id: Mapped[int] = mapped_column(BigInteger, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(

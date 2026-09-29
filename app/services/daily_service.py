@@ -61,7 +61,9 @@ class DailyService:
             for p_data in all_dataset_problems:
                 await ProblemRepository.upsert_from_data(session, p_data)
 
-            all_problems = await ProblemRepository.get_all(session)
+            dataset_numbers = {p.problem_number for p in all_dataset_problems}
+            all_problems = [p for p in await ProblemRepository.get_all(session)
+                            if p.problem_number in dataset_numbers]
             eligible = [p for p in all_problems if p.id not in recent_ids]
 
             if not eligible:

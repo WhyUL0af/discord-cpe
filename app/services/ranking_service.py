@@ -53,7 +53,7 @@ class RankingService:
                 medal = MEDALS[idx] if idx < len(MEDALS) else f"`{idx + 1}.`"
                 mention = f"<@{user.discord_user_id}>"
                 uva_text = f" ({user.uva_username})" if user.uva_username else ""
-                lines.append(f"{medal} {mention}{uva_text}\n**{solved_count} AC**\n")
+                lines.append(f"{medal} {mention}{uva_text}\n**{solved_count} 題已解**\n")
             embed.description = "\n".join(lines)
 
         if stats_footer:
@@ -64,5 +64,5 @@ class RankingService:
                 inline=False,
             )
 
-        embed.set_footer(text="統計依據：每人每題僅計入 1 次 Solved")
+        embed.set_footer(text="統計依據：UVa/uHunt Accepted，每人每題只計一次；週榜計本週首次 AC（UTC）。")
         return embed

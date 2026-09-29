@@ -192,13 +192,13 @@ class ProblemCog(commands.Cog):
 
         # Register primary /cpe command group
         self.cpe_group = CpeGroup(self.problem_service, self.submission_service)
+        self.cpe_group.remove_command("current")
         self.bot.tree.add_command(self.cpe_group)
 
         # Register backward-compatible /problem command group
         self.problem_group = LegacyProblemGroup(self.problem_service)
         self.bot.tree.add_command(self.problem_group)
 
-    @app_commands.command(name="status", description="查看目前正在進行中的題目作答狀態")
     async def status(self, interaction: discord.Interaction) -> None:
         """Alias to /cpe current."""
         await interaction.response.defer(ephemeral=True)

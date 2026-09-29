@@ -7,7 +7,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the environment}
       POSTGRES_DB: cpe_bot
     volumes:
       - cpe_postgres_data:/var/lib/postgresql/data
@@ -36,9 +36,30 @@ services:
     env_file:
       - /etc/discord-cpe/.env
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres_password@postgres:5432/cpe_bot
-    volumes:
-      - .:/app
+      - DATABASE_URL=postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the environment}@postgres:5432/cpe_bot
+    networks:
+      - cpe-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  website:
+    profiles: ["website"]
+    build: .
+    container_name: cpe-website
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - /etc/discord-cpe/.env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the environment}@postgres:5432/cpe_bot
+    command: ["sh", "-c", "alembic upgrade head && uvicorn app.web:app --host 0.0.0.0 --port 8000"]
+    ports:
+      - "127.0.0.1:8000:8000"
     networks:
       - cpe-network
     logging:

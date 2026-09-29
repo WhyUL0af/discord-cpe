@@ -1,204 +1,160 @@
-# CPE Discord Bot - Ubuntu 部署手冊
+# discord-cpe：Ubuntu release 部署
 
-本指南適用於 **Ubuntu 20.04 / 22.04 / 24.04 LTS** 伺服器（AWS EC2、GCP Compute Engine、DigitalOcean Droplet、Linode、自架主機等）。
+採用與 OSV 相同的目錄分工：每次建立新的版本目錄，應用程式以 Docker Compose 執行，機密與資料庫資料放在版本之外。
 
----
-
-## 方案 A：使用 Docker Compose 部署（推薦，採 backup / release / current 架構）
-
-採用業界標準的 Zero-Downtime 發布目錄結構：
-
-```
-/opt/discord-cpe/
-├── current -> release/20260923_214500  # 指向當前正式運行的發布版本軟連結
-├── release/                            # 儲存歷史各時間戳記版本
-└── backup/                             # 部署前自動封存的快照與 DB Dump
-/etc/discord-cpe/
-└── .env                                # 外部共用敏感設定檔
+```text
+/opt/discord-cpe/releases/<release-id>    每次 clone 的版本
+/opt/discord-cpe/current                 成功部署的版本 symlink
+/opt/discord-cpe/previous                上一個版本 symlink
+/etc/discord-cpe/.env                    既有秘密設定
+/srv/discord-cpe/backups                 程式快照與 PostgreSQL SQL 備份
+Docker volume: cpe_postgres_data         沿用既有資料庫
 ```
 
-### Step 1. 建立伺服器目錄結構與配置 `/etc/discord-cpe/.env`
+舊 `/opt/discord-cpe/release/`、`backup/`、`backups/` 都保留，不搬動或刪除。`current` 原本指向舊 `release/` 時也可以部署及回滾。之後建立的版本放在 `releases/`，新備份放在 `/srv/discord-cpe/backups`。
+
+## 1. Windows：先提交並推送
+
+在本機 PowerShell 執行。任何步驟失敗先停止，不要繼續下一步。
+
+```powershell
+cd C:\me\Projects\discord-cpe
+git status --short
+git diff --check
+git add .
+git diff --cached --stat
+git commit -m "Align discord-cpe Ubuntu deployment with OSV release workflow"
+git push origin main
+```
+
+確認 staged 檔案符合預期。`.env` 被忽略，不要強制加入秘密。
+
+## 2. Ubuntu：準備目錄與既有設定
 
 ```bash
-# 1. 建立目錄結構並指派使用者權限
-sudo mkdir -p /opt/discord-cpe/{release,backup}
-sudo mkdir -p /etc/discord-cpe
-sudo chown -R $USER:$USER /opt/discord-cpe
+sudo install -d -m 0755 /opt/discord-cpe/releases
+sudo install -d -m 0700 /srv/discord-cpe/backups
+sudo install -d -m 0750 /etc/discord-cpe
+```
 
-# 2. 建立設定檔
+已有 `/etc/discord-cpe/.env` 就沿用，**不覆蓋為範本**。必要時編輯：
+
+```bash
 sudo nano /etc/discord-cpe/.env
-```
-
-在 `/etc/discord-cpe/.env` 中填入你的設定：
-```ini
-DISCORD_TOKEN=你的真實DiscordBotToken
-SUBMISSION_POLL_INTERVAL=20
-DAILY_REPEAT_COOLDOWN_DAYS=30
-AUTO_ARCHIVE_THREAD=false
-LOG_LEVEL=INFO
-```
-設定保護權限：
-```bash
 sudo chmod 600 /etc/discord-cpe/.env
 ```
 
-### Step 2. 第一次部署（建立首個 release 與 current）
+至少設定 `DISCORD_TOKEN`、`POSTGRES_PASSWORD`。既有 PostgreSQL volume 的密碼必須保持一致；改 `.env` 不會重設資料庫內的密碼。其他選項見 `.env.example`。通知模式不需要 OAuth、網站網域或 Judge0。
+
+## 3. 第一次切換：取得新版部署腳本
+
+你目前 `current` 仍是舊版本，不能直接執行裡面的舊 `deploy.sh`。先取得已推送的新版本作為部署工具入口；不修改舊版本：
 
 ```bash
-# 1. 產生第一版發布目錄
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-git clone https://github.com/WhyUL0af/discord-cpe.git /opt/discord-cpe/release/$TIMESTAMP
-
-# 2. 建立 current 軟連結指向該版本
-ln -sfn /opt/discord-cpe/release/$TIMESTAMP /opt/discord-cpe/current
-
-# 3. 進入 current 啟動容器
-cd /opt/discord-cpe/current
-sudo docker compose up -d --build
+bootstrap_release="/opt/discord-cpe/releases/bootstrap-$(date +%Y%m%d-%H%M%S)"
+sudo git clone --depth 1 --single-branch --branch main \
+  https://github.com/WhyUL0af/discord-cpe.git "$bootstrap_release"
 ```
 
-### Step 3. 後續自動化部署與回滾
-
-在 `/opt/discord-cpe/current` 內已附帶自動化腳本（初次若無執行權限可先執行 `chmod +x deploy.sh rollback.sh`）：
-- **發布新版本**：直接執行 `./deploy.sh`，會自動：
-  1. 備份上一版至 `/opt/discord-cpe/backup/`
-  2. 拉取最新代碼至 `/opt/discord-cpe/release/<新時間戳記>`
-  3. 平滑切換 `current` 軟連結並重新啟動容器
-  4. 清理並保留最新 5 個歷史版本
-- **快速回滾（Rollback）**：若新版本有問題，執行 `./rollback.sh` 即可瞬間將 `current` 切回上一版！
-
-
-
-### Step 4. 檢查運行狀態與即時日誌
+若曾安裝原生 Python 的 `cpe-bot.service`，或服務目前仍在運行，先停止它，避免兩個 Bot 程序同時運作：
 
 ```bash
-# 查看容器運行狀態 (狀態應為 Up / healthy)
-docker compose ps
-
-# 查看 Bot 即時運作日誌
-docker compose logs -f discord-bot
-
-# 查看資料庫日誌
-docker compose logs -f postgres
+if sudo systemctl is-active --quiet cpe-bot.service; then
+  sudo systemctl stop cpe-bot.service
+fi
 ```
 
-### Step 5. 日常維護常用指令
+以新版腳本部署：
 
 ```bash
-# 重啟 Bot
-docker compose restart discord-bot
-
-# 停止所有服務
-docker compose down
-
-# 更新程式碼後重新建置啟動
-git pull
-docker compose up -d --build
+sudo bash "$bootstrap_release/deploy.sh" main
 ```
 
----
+`main` 必須已包含本次修改。可把參數改成現有 branch 或 tag；腳本不接受裸 commit SHA。
 
-## 方案 B：使用 Systemd 系統服務原生部署（無 Docker）
+## 4. 部署腳本做什麼
 
-若您的 Ubuntu 伺服器已安裝共用的 PostgreSQL，或不希望使用 Docker，可使用 Systemd 管理守護進程。
+1. 檢查 Docker Compose、外部 `.env` 及部署鎖，避免同時部署或回滾。
+2. Clone branch/tag 到新的 `releases/<時間>-<PID>`。
+3. 用 `compose config --quiet` 驗證設定，不印出展開後的秘密。
+4. 建置 Bot image；程式碼包含在 image 中，正式 Compose 不掛載工作目錄。
+5. 備份舊版本程式碼（不追隨 `.env` symlink）。
+6. 啟動並確認 PostgreSQL 健康，執行 `pg_dump`；失敗就停止，不忽略備份錯誤。
+7. 停止舊可選網站，啟動新版 Bot。容器入口自動執行 `alembic upgrade head`。
+8. 最多等待 120 秒，確認 Bot 的 Discord ready 日誌及容器仍在運行。
+9. 顯示 `alembic current`，更新 `previous` 與 `current`，列出容器狀態。
 
-### Step 1. 安裝系統依賴與 PostgreSQL
+切換後的啟動檢查失敗會嘗試重新啟動原版本，但不宣稱已成功復原，仍需檢查日誌。資料庫不自動降版或還原，已執行的 migration 可能需要另外處理。
+
+這是單一 Bot 重啟部署，**不是零停機部署**。舊版本與 SQL 備份均保留，不執行自動刪除或 `docker compose down -v`。
+
+## 5. 安裝 systemd：開機啟動 Compose
+
+新版 `cpe-bot.service` 與 OSV 一樣使用 `Type=oneshot`、`RemainAfterExit=yes`，管理 Compose；不再直接啟動 host Python。
 
 ```bash
-sudo apt-get update
-sudo apt-get install -y python3 python3-pip python3-venv postgresql postgresql-contrib git
-```
-
-### Step 2. 建立專用資料庫與使用者
-
-```bash
-sudo -u postgres psql
-```
-在 psql 中執行：
-```sql
-CREATE DATABASE cpe_bot;
-CREATE USER cpe_user WITH ENCRYPTED PASSWORD 'your_strong_password';
-GRANT ALL PRIVILEGES ON DATABASE cpe_bot TO cpe_user;
-ALTER DATABASE cpe_bot OWNER TO cpe_user;
-\q
-```
-
-### Step 3. 建立 Python 虛擬環境與安裝依賴
-
-```bash
-sudo mkdir -p /opt/discord-cpe
-sudo chown -R $USER:$USER /opt/discord-cpe
-cd /opt/discord-cpe
-
-# 放置程式碼於此目錄後：
-python3 -m venv .venv
-source .venv/bin/activate
-
-pip install --upgrade pip
-pip install -r requirements.txt
-```
-
-### Step 4. 設定環境變數與執行資料庫遷移
-
-```bash
-sudo mkdir -p /etc/discord-cpe
-sudo cp /opt/discord-cpe/.env.example /etc/discord-cpe/.env
-sudo chmod 600 /etc/discord-cpe/.env
-sudo nano /etc/discord-cpe/.env
-```
-修改 `/etc/discord-cpe/.env` 中的 `DATABASE_URL` 與 `DISCORD_TOKEN`：
-```ini
-DATABASE_URL=postgresql+asyncpg://cpe_user:your_strong_password@localhost:5432/cpe_bot
-DISCORD_TOKEN=你的_DISCORD_BOT_TOKEN
-```
-
-執行 Alembic 資料庫 Migration：
-```bash
-cd /opt/discord-cpe
-ENV_FILE=/etc/discord-cpe/.env alembic upgrade head
-```
-
-### Step 5. 註冊 Systemd 系統服務（自動重啟與開機啟動）
-
-將專案目錄下的 `cpe-bot.service` 複製至 systemd 目錄：
-```bash
-# 確認 cpe-bot.service 中的 User 與路徑與伺服器環境一致
-sudo cp cpe-bot.service /etc/systemd/system/cpe-bot.service
-
-# 重新載入 systemd 配置
+sudo install -m 0644 /opt/discord-cpe/current/cpe-bot.service \
+  /etc/systemd/system/cpe-bot.service
 sudo systemctl daemon-reload
-
-# 啟用開機自啟動並立即啟動服務
-sudo systemctl enable --now cpe-bot
-
-# 查看服務運行狀態
-sudo systemctl status cpe-bot
-
-# 查看即時日誌
-sudo journalctl -u cpe-bot -f
+sudo systemctl enable --now cpe-bot.service
+sudo systemctl status cpe-bot.service --no-pager
 ```
 
----
+`active (exited)` 是此類 Compose 管理單元的正常狀態，仍須用容器狀態及 Bot 日誌確認實際運作。容器的 `restart: unless-stopped` 負責自動重啟。
 
-## 伺服器安全性最佳實踐 (Security Checklist)
+## 6. 後續更新
 
-1. **UFW 防火牆保護**：
-   - 確保 PostgreSQL 的 5432 埠**不要**開放給公網。
-   - 只允許 SSH (22) 與必要的網路流量：
-     ```bash
-     sudo ufw default deny incoming
-     sudo ufw default allow outgoing
-     sudo ufw allow 22/tcp
-     sudo ufw enable
-     ```
-2. **保護 `.env` 權限**：
-   - 確保除了執行 Bot 的使用者之外，其他帳號無法讀取：
-     ```bash
-     chmod 600 /opt/discord-cpe/.env
-     ```
-3. **資料庫定期備份**：
-   可加入每日 crontab 自動備份資料：
-   ```bash
-   # Docker Compose 備份指令：
-   docker compose exec -T postgres pg_dump -U postgres cpe_bot > /opt/backups/cpe_bot_$(date +%Y%m%d).sql
-   ```
+Windows 提交並推送後，在 Ubuntu 執行：
+
+```bash
+sudo bash /opt/discord-cpe/current/deploy.sh main
+```
+
+每次建立新版本；不在 current 裡 `git pull`，也不直接覆寫既有版本。
+
+## 7. 查看狀態與日誌
+
+可以從任何工作目錄執行，明確指定 Compose 設定檔：
+
+```bash
+sudo docker compose --project-name cpe-bot \
+  --env-file /etc/discord-cpe/.env \
+  -f /opt/discord-cpe/current/docker-compose.yml ps
+
+sudo docker compose --project-name cpe-bot \
+  --env-file /etc/discord-cpe/.env \
+  -f /opt/discord-cpe/current/docker-compose.yml logs --tail=100 discord-bot
+
+sudo docker compose --project-name cpe-bot \
+  --env-file /etc/discord-cpe/.env \
+  -f /opt/discord-cpe/current/docker-compose.yml exec -T discord-bot alembic current
+```
+
+不要把 `.env` 或完整 `docker compose config` 輸出貼到聊天。
+
+## 8. 回滾應用程式
+
+回到 previous：
+
+```bash
+sudo bash /opt/discord-cpe/current/rollback.sh
+```
+
+或指定既有版本目錄名稱（支援新 `releases/` 與舊 `release/`）：
+
+```bash
+sudo bash /opt/discord-cpe/current/rollback.sh 20260924_222658
+```
+
+回滾前同樣備份當前資料庫；重建並確認目標 Bot 連線成功後，才更新 current。這只回滾程式碼，**不還原資料庫 schema 或資料**。舊程式與新 migration 是否相容需確認；備份位於 `/srv/discord-cpe/backups`。
+
+## 9. Discord 人工驗證
+
+- `/practice_center` 固定面板及題目入口正確。
+- `/link` 成功或失敗只有本人可見。
+- 兩位使用者點同一個「查看提交結果」，各自只看到本人紀錄。
+- 自行到 UVa 提交後，背景同步結果；不發評測私訊。
+- 重複 AC 不增加已解題數。
+- `/mock_exam` 發送 7 題與結果查詢入口。
+
+目前僅完成腳本及設定的本機靜態檢查。實際 Ubuntu Docker 建置、備份、migration、Discord ready、systemd 與回滾仍需在主機上執行確認。

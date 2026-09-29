@@ -23,7 +23,7 @@ class AccountCog(commands.Cog):
     @app_commands.command(name="link", description="綁定你的 UVa Online Judge 帳號")
     @app_commands.describe(uva_username="你的 UVa Online Judge 使用者名稱")
     async def link(self, interaction: discord.Interaction, uva_username: str) -> None:
-        await interaction.response.defer(ephemeral=False)
+        await interaction.response.defer(ephemeral=True)
 
         async with get_db_session() as session:
             try:
@@ -40,9 +40,9 @@ class AccountCog(commands.Cog):
                 )
                 embed.add_field(name="Discord：", value=f"<@{interaction.user.id}>", inline=False)
                 embed.add_field(name="UVa：", value=f"`{user.uva_username}`", inline=False)
-                embed.set_footer(text="綁定成功！現在可以開始在刷題區或每日一題作答。")
+                embed.set_footer(text="直接到 UVa 提交，再點「查看提交結果」取得私人回覆；排行榜自動更新，不發私訊。")
 
-                await interaction.followup.send(embed=embed)
+                await interaction.followup.send(embed=embed, ephemeral=True)
             except UvaUserNotFoundException:
                 await interaction.followup.send(
                     f"❌ 找不到 UVa User：{uva_username}",

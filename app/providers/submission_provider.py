@@ -84,6 +84,26 @@ class SubmissionProvider:
         self.base_url = (base_url or settings.UHUNT_BASE_URL).rstrip("/")
         self.timeout = timeout or settings.UHUNT_TIMEOUT_SECONDS
 
+    async def get_problem_submissions(self, uva_user_id: int, pids: list[int], min_sub_id: int = 0) -> List[SubmissionData]:
+        """Strict, scoped polling. A failed request must not advance the cursor."""
+        results = []
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            for offset in range(0, len(pids), 100):
+                chunk = ",".join(str(pid) for pid in pids[offset:offset + 100])
+                response = await client.get(f"{self.base_url}/subs-pids/{uva_user_id}/{chunk}/{min_sub_id}")
+                response.raise_for_status()
+                data = response.json()
+                if not isinstance(data, dict) or str(uva_user_id) not in data:
+                    raise ValueError("Invalid uHunt subs-pids response")
+                rows = data[str(uva_user_id)]
+                if not isinstance(rows, list):
+                    raise ValueError("Invalid uHunt submissions list")
+                for row in rows:
+                    if not isinstance(row, list) or len(row) < 6:
+                        raise ValueError("Invalid uHunt submission row")
+                    results.append(SubmissionData(*(int(value) for value in row[:6])))
+        return sorted(results, key=lambda sub: sub.submission_id)
+
     async def get_latest_submission_id(self, uva_user_id: int) -> int:
         """Fetch the most recent submission ID for a user.
 

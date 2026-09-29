@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import List, Optional
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -37,8 +38,15 @@ class SolvedRepository:
             problem_id=problem_id,
             first_accepted_at=accepted_at or datetime.now(timezone.utc),
         )
-        session.add(solved)
-        await session.flush()
+        try:
+            async with session.begin_nested():
+                session.add(solved)
+                await session.flush()
+        except IntegrityError:
+            existing = await SolvedRepository.get_by_user_and_problem(session, user_id, problem_id)
+            if existing:
+                return existing
+            raise
         return solved
 
     @staticmethod

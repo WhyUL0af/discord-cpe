@@ -28,6 +28,14 @@ class GlobalErrorHandler(commands.Cog):
         else:
             original = error
 
+        if isinstance(original, app_commands.MissingPermissions):
+            msg = "⚠️ 此指令需要管理訊息權限。"
+            if interaction.response.is_done():
+                await interaction.followup.send(msg, ephemeral=True)
+            else:
+                await interaction.response.send_message(msg, ephemeral=True)
+            return
+
         if isinstance(original, UvaUserNotFoundException):
             msg = f"❌ {str(original)}"
             if interaction.response.is_done():

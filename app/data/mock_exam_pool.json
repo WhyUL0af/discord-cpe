@@ -1,0 +1,23 @@
+{
+  "rating_note": "Practice levels and topics are maintained by this project, not official CPE star ratings. Blueprint: 2 basic, 2 intermediate, 2 advanced, 1 challenge.",
+  "problems": [
+    {"number": 10055, "level": 1, "topic": "arithmetic", "one_star": true},
+    {"number": 10035, "level": 1, "topic": "arithmetic", "one_star": true},
+    {"number": 272, "level": 1, "topic": "strings", "one_star": true},
+    {"number": 10038, "level": 1, "topic": "sequences", "one_star": true},
+    {"number": 10189, "level": 1, "topic": "simulation", "one_star": true},
+    {"number": 299, "level": 2, "topic": "sorting"},
+    {"number": 10191, "level": 2, "topic": "simulation"},
+    {"number": 10226, "level": 2, "topic": "frequency"},
+    {"number": 10611, "level": 2, "topic": "binary_search"},
+    {"number": 10954, "level": 2, "topic": "greedy_heap"},
+    {"number": 10004, "level": 3, "topic": "graph_traversal"},
+    {"number": 10003, "level": 3, "topic": "dynamic_programming"},
+    {"number": 10341, "level": 3, "topic": "numeric_search"},
+    {"number": 11450, "level": 3, "topic": "dynamic_programming"},
+    {"number": 10298, "level": 3, "topic": "string_matching"},
+    {"number": 10048, "level": 4, "topic": "graph_paths"},
+    {"number": 11504, "level": 4, "topic": "graph_components"},
+    {"number": 116, "level": 4, "topic": "dynamic_programming"}
+  ]
+}

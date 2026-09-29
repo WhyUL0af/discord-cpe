@@ -1,16 +1,16 @@
 [Unit]
-Description=CPE Discord Bot Service
-After=network.target postgresql.service
-Wants=postgresql.service
+Description=CPE Discord notification bot (Docker Compose)
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
 
 [Service]
-Type=simple
-User=ubuntu
+Type=oneshot
+RemainAfterExit=yes
 WorkingDirectory=/opt/discord-cpe/current
-EnvironmentFile=/etc/discord-cpe/.env
-ExecStart=/opt/discord-cpe/current/.venv/bin/python main.py
-Restart=always
-RestartSec=5
+ExecStart=/usr/bin/docker compose --project-name cpe-bot --env-file /etc/discord-cpe/.env -f /opt/discord-cpe/current/docker-compose.yml up -d postgres discord-bot
+ExecStop=/usr/bin/docker compose --project-name cpe-bot --env-file /etc/discord-cpe/.env -f /opt/discord-cpe/current/docker-compose.yml stop discord-bot postgres
+TimeoutStartSec=0
 StandardOutput=journal
 StandardError=journal
 

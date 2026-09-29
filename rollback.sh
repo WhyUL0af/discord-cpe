@@ -1,42 +1,35 @@
 #!/usr/bin/env bash
-# ==============================================================================
-# CPE Discord Bot - Rollback Script
-# Roll back 'current' symlink to the previous release
-# ==============================================================================
-
-set -euo pipefail
-
-APP_ROOT="/opt/discord-cpe"
-RELEASE_BASE="$APP_ROOT/release"
-CURRENT_LINK="$APP_ROOT/current"
-
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-NC='\033[0m'
-
-log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
-log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
-
-cd "$RELEASE_BASE"
-RELEASES=($(ls -dt */ 2>/dev/null | tr -d '/'))
-
-if [ "${#RELEASES[@]}" -lt 2 ]; then
-    log_error "No previous release found in $RELEASE_BASE to roll back to!"
-    exit 1
+# Roll back application code only; database migrations are not reversed.
+set -Eeuo pipefail
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+source "$SCRIPT_DIR/deploy/ubuntu/common.sh"
+require_host
+OLD_RELEASE=$(checked_release "$CURRENT_LINK")
+if [[ -n ${1:-} ]]; then
+    [[ $1 =~ ^[A-Za-z0-9_-]+$ ]] || fail "請提供版本目錄名稱，不要提供路徑。"
+    if [[ -d "$RELEASE_BASE/$1" ]]; then
+        TARGET=$(checked_release "$RELEASE_BASE/$1")
+    else
+        TARGET=$(checked_release "$APP_ROOT/release/$1")
+    fi
+else
+    [[ -L "$PREVIOUS_LINK" ]] || fail "尚無 previous 版本；請提供要回滾的版本目錄名稱。"
+    TARGET=$(checked_release "$PREVIOUS_LINK")
 fi
-
-CURRENT_TARGET=$(basename "$(readlink -f "$CURRENT_LINK")")
-PREVIOUS_RELEASE="${RELEASES[1]}"
-
-log_info "Active release:   $CURRENT_TARGET"
-log_info "Rolling back to:  $PREVIOUS_RELEASE"
-
-ln -sfn "$RELEASE_BASE/$PREVIOUS_RELEASE" "$CURRENT_LINK"
-
-cd "$CURRENT_LINK"
-docker compose up -d --build
-
-log_success "Successfully rolled back to $PREVIOUS_RELEASE!"
-docker compose ps
+[[ "$TARGET" != "$OLD_RELEASE" ]] || fail "指定版本已經是 current。"
+compose_at "$TARGET" config --quiet
+compose_at "$TARGET" build discord-bot
+compose_at "$TARGET" up -d postgres
+wait_postgres
+backup_database "before-rollback-$(date +%Y%m%d-%H%M%S)-$$"
+STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+compose_at "$TARGET" up -d --no-deps --force-recreate discord-bot
+if ! wait_bot "$STARTED_AT"; then
+    log "回滾版本未確認連線成功；current 保持原設定。" >&2
+    compose_at "$OLD_RELEASE" up -d --build postgres discord-bot || true
+    fail "請檢查 Bot 日誌。資料庫沒有自動降版或還原。"
+fi
+set_link "$OLD_RELEASE" "$PREVIOUS_LINK"
+set_link "$TARGET" "$CURRENT_LINK"
+log "應用程式回滾成功：$TARGET；資料庫 migration 維持原狀。"
+compose_at "$TARGET" ps

@@ -133,7 +133,7 @@ class CpeProblemProvider(BaseProblemProvider):
                 if res.status_code != 200:
                     return None
                 data = res.json()
-                if not data or not data.get("pid"):
+                if not data or not data.get("pid") or data.get("status") == 0:
                     return None
 
                 existing_difficulty = (

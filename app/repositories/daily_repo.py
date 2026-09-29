@@ -1,4 +1,5 @@
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
+from zoneinfo import ZoneInfo
 from typing import List, Optional
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,7 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from app.models.daily import DailyProblem
 from app.models.problem import Problem
-from app.models.solved import UserSolvedProblem
+from app.repositories.ranking_repo import external_solved_query
 
 
 class DailyRepository:
@@ -106,14 +107,16 @@ class DailyRepository:
         target_date: date
     ) -> int:
         """Count how many distinct users solved problem_id on target_date."""
-        start_dt = datetime.combine(target_date, time.min, tzinfo=timezone.utc)
-        end_dt = datetime.combine(target_date, time.max, tzinfo=timezone.utc)
+        start_local = datetime.combine(target_date, time.min, tzinfo=ZoneInfo("Asia/Taipei"))
+        start_dt = start_local.astimezone(timezone.utc)
+        end_dt = (start_local + timedelta(days=1)).astimezone(timezone.utc)
+        solved = external_solved_query()
         stmt = (
-            select(func.count(UserSolvedProblem.id))
+            select(func.count(solved.c.user_id))
             .where(
-                UserSolvedProblem.problem_id == problem_id,
-                UserSolvedProblem.first_accepted_at >= start_dt,
-                UserSolvedProblem.first_accepted_at <= end_dt,
+                solved.c.problem_id == problem_id,
+                solved.c.first_accepted_at >= start_dt,
+                solved.c.first_accepted_at < end_dt,
             )
         )
         result = await session.execute(stmt)

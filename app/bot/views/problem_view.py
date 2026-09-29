@@ -11,12 +11,9 @@ from app.models.submission import Submission
 from app.repositories.daily_repo import DailyRepository
 from app.repositories.submission_repo import SubmissionRepository
 from app.services.daily_service import DailyService
-from app.services.problem_service import (
-    ActiveSessionConflictException,
-    ProblemService,
-    UserNotLinkedException,
-)
+from app.services.problem_service import ProblemService
 from app.services.submission_service import SubmissionService
+from app.bot.views.submission_results_view import SubmissionResultsButton
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +41,7 @@ def create_problem_embed(problem: Problem) -> discord.Embed:
         embed.add_field(name="Time Limit", value=f"{problem.time_limit} ms", inline=True)
     if problem.source:
         embed.add_field(name="Source", value=problem.source, inline=True)
-    embed.set_footer(text="點擊「🌐 查看題目」開啟題目，點擊「▶ 開始作答」記錄作答。")
+    embed.set_footer(text="自行至 UVa 提交；先用 /link 綁定帳號，Bot 會自動追蹤 uHunt 評測結果。")
     return embed
 
 
@@ -104,8 +101,10 @@ def create_current_problem_embed(
 
 def create_practice_center_embed() -> discord.Embed:
     embed = discord.Embed(
-        title="💻 CPE 刷題中心",
-        description="在這裡進行 CPE 題目練習。\n你的題目、作答紀錄與提交結果只有你自己能看到。",
+        title="💻 CPE 自主練習",
+        description=("點下方按鈕取得題目，題目回覆只有你自己看得到。\n\n"
+                     "先用 `/link` 綁定 UVa 帳號，再閱讀題目並自行到 UVa Online Judge 提交。\n"
+                     "點「🔄 查看提交結果」取得私人回覆；排行榜自動更新，不會發送私訊。"),
         color=discord.Color.blue(),
     )
     embed.set_footer(text="CPE Discord Bot ｜ 提升程式能力，輕鬆應考 CPE")
@@ -271,13 +270,7 @@ async def start_problem_for_user(
     problem_service: Optional[ProblemService] = None,
     is_daily: bool = False,
 ) -> None:
-    """Shared business logic for starting a problem session for a user.
-
-    Used by:
-    - DailyProblemView.start_button
-    - ProblemSelectionView.start_button (from /cpe random, /cpe easy, /cpe problem, and practice center)
-    - PracticeService.start_problem
-    """
+    """Resolve legacy buttons and explain the external submission workflow."""
     is_done = False
     try:
         res = interaction.response.is_done()
@@ -315,78 +308,13 @@ async def start_problem_for_user(
         await interaction.followup.send("⚠️ 找不到題目資料，請稍後再試。", ephemeral=True)
         return
 
-    # 2. Start session using ProblemService
-    async with get_db_session() as session:
-        try:
-            username = getattr(interaction.user, "name", str(interaction.user.id))
-            existing_session, is_new = await problem_service.start_problem_session(
-                session=session,
-                discord_user_id=interaction.user.id,
-                problem_number=target_problem.problem_number,
-                discord_username=username,
-            )
-
-            link_view = None
-            if target_problem.external_url:
-                link_view = discord.ui.View()
-                link_view.add_item(
-                    discord.ui.Button(
-                        label="🌐 查看題目",
-                        url=target_problem.external_url,
-                        style=discord.ButtonStyle.link,
-                    )
-                )
-
-            if is_new:
-                embed = discord.Embed(
-                    title="✅ 已開始作答",
-                    description=(
-                        f"**UVa {target_problem.problem_number}**\n"
-                        f"{target_problem.title}\n\n"
-                        f"Bot 將開始追蹤你的 UVa Submission。\n\n"
-                        f"💡 **提示**：請前往 UVa 提交程式碼，評測結果將透過 **Discord 私訊 (DM)** 即時通知。\n"
-                        f"請確保你的 Discord 隱私設定允許接收私訊。"
-                    ),
-                    color=discord.Color.green(),
-                )
-                await interaction.followup.send(embed=embed, view=link_view, ephemeral=True)
-            else:
-                embed = discord.Embed(
-                    title="ℹ️ 你目前正在作答此題目",
-                    description=(
-                        f"你目前正在作答 **UVa {target_problem.problem_number} - {target_problem.title}**。\n\n"
-                        f"Bot 持續追蹤你的提交中。在 UVa 提交後會透過私訊通知，亦可使用 `/cpe current` 查看進度。"
-                    ),
-                    color=discord.Color.blue(),
-                )
-                await interaction.followup.send(embed=embed, view=link_view, ephemeral=True)
-
-        except ActiveSessionConflictException as conflict:
-            active_prob = conflict.active_session.problem
-            prob_title = active_prob.title if active_prob else ""
-            prob_num = active_prob.problem_number if active_prob else conflict.active_session.problem_id
-            embed = discord.Embed(
-                title="⚠️ 你目前正在作答其他題目",
-                description=(
-                    f"你目前正在作答：\n\n"
-                    f"**UVa {prob_num} - {prob_title}**\n\n"
-                    f"每位使用者同時只能有一題進行中的題目。\n"
-                    f"請先結束目前作答，才能開始新題目！"
-                ),
-                color=discord.Color.orange(),
-            )
-            conflict_view = ActiveConflictView(conflict.active_session, problem_service)
-            await interaction.followup.send(embed=embed, view=conflict_view, ephemeral=True)
-
-        except UserNotLinkedException:
-            await interaction.followup.send(
-                "⚠️ 尚未綁定 UVa 帳號\n\n請先使用：\n`/link <UVa Username>`\n\n完成帳號綁定後即可開始作答。",
-                ephemeral=True,
-            )
-
-        except Exception as e:
-            logger.exception(f"Error starting problem session for {interaction.user.id}: {e}")
-            await interaction.followup.send("⚠️ 啟動作答時發生錯誤，請稍後再試。", ephemeral=True)
+    # Legacy buttons now provide instructions without creating single-problem sessions.
+    await interaction.followup.send(
+        f"請自行至 UVa Online Judge 提交 **UVa {target_problem.problem_number}**。\n"
+        "使用 `/link` 綁定 UVa 帳號後，Bot 會自動追蹤題庫中的提交結果；可同時練習多題。",
+        ephemeral=True,
+    )
+    return
 
 
 class ProblemSelectionView(discord.ui.View):
@@ -403,10 +331,14 @@ class ProblemSelectionView(discord.ui.View):
         self.problem_service = problem_service or ProblemService()
         self.refresh_mode = refresh_mode
 
+        self.remove_item(self.start_button)
+        self.add_item(discord.ui.Button(label="🌐 前往 UVa 提交", url="https://onlinejudge.org/"))
+        self.add_item(SubmissionResultsButton())
+
         if problem.external_url:
             self.add_item(
                 discord.ui.Button(
-                    label="🌐 查看題目",
+                    label="📖 查看題目",
                     url=problem.external_url,
                     style=discord.ButtonStyle.link,
                 )
@@ -507,6 +439,8 @@ class PracticeCenterView(discord.ui.View):
         super().__init__(timeout=None)
         self.problem_service = problem_service or ProblemService()
         self.submission_service = submission_service or SubmissionService()
+        self.remove_item(self.current_button)
+        self.add_item(SubmissionResultsButton())
 
     @discord.ui.button(
         label="🎲 隨機一題",
@@ -530,7 +464,7 @@ class PracticeCenterView(discord.ui.View):
             await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
     @discord.ui.button(
-        label="⭐ 一星題",
+        label="⭐ 基礎題",
         style=discord.ButtonStyle.success,
         custom_id="cpe_practice_easy",
     )
@@ -551,7 +485,7 @@ class PracticeCenterView(discord.ui.View):
             await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
     @discord.ui.button(
-        label="🔎 指定題目",
+        label="🔎 指定題號",
         style=discord.ButtonStyle.secondary,
         custom_id="cpe_practice_search",
     )
@@ -594,7 +528,7 @@ class PracticeCenterView(discord.ui.View):
             await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
     @discord.ui.button(
-        label="✅ 已完成題目",
+        label="✅ 已解題目",
         style=discord.ButtonStyle.secondary,
         custom_id="cpe_practice_solved",
     )
@@ -640,8 +574,12 @@ class DailyProblemView(discord.ui.View):
         self.problem = problem
         self.problem_service = problem_service or ProblemService()
         self.daily_service = daily_service or DailyService()
+        self.add_item(SubmissionResultsButton())
 
-        # Link button (only added when problem with external_url is present upon creation)
+        if problem:
+            self.remove_item(self.start_button)
+            self.add_item(discord.ui.Button(label="🌐 前往 UVa 提交", url="https://onlinejudge.org/"))
+
         if problem and problem.external_url:
             self.add_item(
                 discord.ui.Button(

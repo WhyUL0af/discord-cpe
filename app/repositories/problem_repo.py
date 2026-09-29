@@ -1,5 +1,5 @@
 from typing import List, Optional
-from sqlalchemy import select
+from sqlalchemy import select, or_, cast, String, exists
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.problem import Problem
@@ -7,6 +7,22 @@ from app.providers.problem_provider import ProblemData
 
 
 class ProblemRepository:
+    @staticmethod
+    async def search(session: AsyncSession, user_id: int | None, q: str = "", difficulty: str = "", solved: str = "", category: str = ""):
+        from app.models.solved import UserSolvedProblem
+        stmt = select(Problem)
+        if q:
+            stmt = stmt.where(or_(Problem.title.ilike(f"%{q}%"), cast(Problem.problem_number, String).ilike(f"%{q}%")))
+        if difficulty:
+            stmt = stmt.where(Problem.difficulty == difficulty)
+        if category:
+            stmt = stmt.where(Problem.category == category)
+        if solved:
+            solved_query = exists(select(UserSolvedProblem.id).where(
+                UserSolvedProblem.problem_id == Problem.id, UserSolvedProblem.user_id == user_id))
+            stmt = stmt.where(solved_query if solved == "solved" else ~solved_query)
+        return list((await session.scalars(stmt.order_by(Problem.problem_number).limit(500))).all())
+
     @staticmethod
     async def get_by_number(session: AsyncSession, problem_number: int) -> Optional[Problem]:
         stmt = select(Problem).where(Problem.problem_number == problem_number)

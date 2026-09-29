@@ -1,0 +1,25 @@
+{
+  "fixture_name": "uva100-development-only",
+  "official_judge_data": false,
+  "problem": {
+    "problem_number": 100,
+    "title": "The 3n + 1 Problem",
+    "difficulty": "⭐",
+    "category": "simulation",
+    "source": "Development fixture (not official judge data)",
+    "external_url": "https://onlinejudge.org/external/1/100.pdf",
+    "time_limit": 3000,
+    "memory_limit": 131072,
+    "statement": "For each pair of positive integers i and j, consider every integer between them, inclusive. For each integer n, repeatedly apply n/2 when n is even or 3n+1 when n is odd until reaching 1. The cycle length counts every value including the starting value and 1. Report i, j, and the maximum cycle length in the interval. This text and its tests are a development fixture, not official UVa judge material.",
+    "input_description": "Each line contains two positive integers i and j (at most 1,000,000). Input ends at EOF.",
+    "output_description": "For each input line, print i, j, and the maximum cycle length for all integers in the inclusive interval between i and j.",
+    "sample_input": "1 10\n100 200\n",
+    "sample_output": "1 10 20\n100 200 125\n",
+    "test_cases": [
+      {"input": "1 10\n100 200\n", "output": "1 10 20\n100 200 125\n", "hidden": false},
+      {"input": "10 1\n", "output": "10 1 20\n", "hidden": false},
+      {"input": "201 210\n900 1000\n", "output": "201 210 89\n900 1000 174\n", "hidden": true},
+      {"input": "1 1\n", "output": "1 1 1\n", "hidden": true}
+    ]
+  }
+}

@@ -10,6 +10,7 @@ INITIAL_EXTENSIONS = [
     "app.bot.commands.account_cog",
     "app.bot.commands.problem_cog",
     "app.bot.commands.rank_cog",
+    "app.bot.commands.mock_exam_cog",
     "app.tasks.submission_tracker",
     "app.tasks.daily_problem_task",
     "app.tasks.ranking_updater_task",
@@ -38,8 +39,10 @@ class CpeBot(commands.Bot):
 
         # Register persistent views for button interactions across restarts
         from app.bot.views.problem_view import DailyProblemView, PracticeCenterView
+        from app.bot.views.submission_results_view import SubmissionResultsView
         self.add_view(PracticeCenterView())
         self.add_view(DailyProblemView())
+        self.add_view(SubmissionResultsView())
 
         logger.info("Syncing application commands with Discord...")
         try:
