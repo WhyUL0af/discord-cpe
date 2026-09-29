@@ -96,6 +96,9 @@ class SubmissionProvider:
                 if not isinstance(data, dict) or str(uva_user_id) not in data:
                     raise ValueError("Invalid uHunt subs-pids response")
                 rows = data[str(uva_user_id)]
+                # Live subs-pids responses wrap submissions in a user object.
+                if isinstance(rows, dict):
+                    rows = rows.get("subs")
                 if not isinstance(rows, list):
                     raise ValueError("Invalid uHunt submissions list")
                 for row in rows:
